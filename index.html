@@ -1622,6 +1622,25 @@ async function fetchPlayers() {
     // Delta: positive = we rank higher than market = BUY opportunity
     players.forEach(p => { p.delta = p.hkb > 0 ? p.hkbRank - p.dynRank : 0; });
 
+    // ── POSITIONAL RANK — rank each player within their true position pool
+    // This fixes the catcher/SS problem where poolRk compares against all hitters.
+    // posRank replaces poolRk in display so Baldwin shows #3 C, not #72 pool.
+    const posPools = {};
+    for (const p of players) {
+      if (p.type !== 'H') continue;
+      const pos = p.pos.split('/')[0]; // primary position
+      if (!posPools[pos]) posPools[pos] = [];
+      posPools[pos].push(p);
+    }
+    for (const pos of Object.keys(posPools)) {
+      posPools[pos]
+        .sort((a,b) => (b.dynZ||0) - (a.dynZ||0))
+        .forEach((p, i) => { p.posRank = i + 1; p.posLabel = pos; });
+    }
+    // SP and RP already have correct poolRk from sheet — just mirror it
+    players.filter(p => p.type==='SP'||p.type==='RP')
+      .forEach(p => { p.posRank = p.poolRk; p.posLabel = p.type; });
+
     STATE.players = players;
     STATE.lastSync = new Date().toLocaleTimeString();
     return players;
@@ -1758,7 +1777,11 @@ function renderPlayerTable() {
         </div>
         <div style="margin-top:3px;display:flex;align-items:center;gap:5px">
           <span class="badge badge-${arch.cls}">${arch.label}</span>
-          <span class="mono" style="font-size:9px;color:var(--text-muted)">#${p.poolRk||'—'} pool</span>
+          <span class="mono" style="font-size:9px;font-weight:600;color:${
+            (p.posRank||99) <= 3  ? 'var(--green)' :
+            (p.posRank||99) <= 8  ? 'var(--gold)'  :
+            (p.posRank||99) <= 15 ? 'var(--text-dim)' : 'var(--text-muted)'
+          }">#${p.posRank||p.poolRk||'—'} ${p.posLabel||'pool'}</span>
         </div>
       </td>
       <td class="mono" style="font-size:13px;color:${ageColor};font-weight:700">${p.age || '—'}</td>
