@@ -1250,7 +1250,7 @@ const ROSTER_SLOTS = [
 // ════════════════════════════════════════════════════════════════════
 const STATE = {
   players: [],
-  sortCol: 'hkb',
+  sortCol: 'dynZ',
   sortDir: -1,
   filter: 'ALL',
   search: '',
@@ -1411,6 +1411,10 @@ async function fetchPlayers() {
         prosp:  KNOWN_PROSPECTS.has(cleanName(name)),
         flag:   (cols[22] || '').trim(),
         notes:  (cols[23] || '').trim(),
+        // Column Y (index 24) = HKB_VALUE entered manually in Google Sheet.
+        // If populated, use it as the primary HKB source.
+        // Fallback to hardcoded lookup table happens after fetch in the HKB inject step.
+        sheetHKB: pi(cols[24]) || 0,
         hkb: 0, hkbRank: 0, dynRank: 0, delta: 0, pitchPlus: null,
       });
     }
@@ -1434,8 +1438,10 @@ async function fetchPlayers() {
 
     setProgress(55, 'COMPUTING DELTA RANKINGS...');
 
-    // Inject HKB values
-    for (const p of players) p.hkb = lookupHKB(p.name);
+    // Inject HKB values — sheet column Y takes priority, hardcoded table as fallback
+    for (const p of players) {
+      p.hkb = p.sheetHKB > 0 ? p.sheetHKB : lookupHKB(p.name);
+    }
 
     // ── INJECT ENO DATA FIRST (needed for Pitching+ multiplier) ───────
     players.forEach(p => {
