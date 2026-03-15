@@ -1588,21 +1588,67 @@ const CONSTITUTION = {
   GAP_GRACE_PICKS:    2,    // picks a positional gap is tolerated before force-fill
 };
 
-// Track how many rounds each position has been empty
-const GAP_TRACKER = { C:0, '1B':0, '2B':0, '3B':0, SS:0, OF:0 };
+// ════════════════════════════════════════════════════════════════════
+// POSITIONAL URGENCY THRESHOLDS — round-based, not pick-count based
+// Each position has a WARN round and a FORCE round.
+// WARN  = advice bar starts flagging it (yellow/orange)
+// FORCE = TAKE engine overrides BDA and fills it immediately (red)
+// Thresholds based on dynasty scarcity at each position.
+// ════════════════════════════════════════════════════════════════════
+const POS_URGENCY = {
+  //       warn  force
+  SS:   { warn: 2,  force: 4  },  // scarcest position — fills fastest
+  C:    { warn: 5,  force: 8  },  // only 2-3 worth owning in any league
+  '1B': { warn: 3,  force: 6  },  // deep but important for scoring
+  '3B': { warn: 4,  force: 7  },
+  '2B': { warn: 4,  force: 7  },
+  OF:   { warn: 3,  force: 6  },  // 3 slots — need at least 1 by R6
+};
 
-function updateGapTracker() {
+function getPosGaps() {
+  // Returns array of {pos, urgency:'warn'|'force', best} sorted by urgency
   const my = STATE.myDrafted;
-  const has = pos => my.some(p =>
-    p.pos === pos || p.pos.startsWith(pos+'/') || p.pos.includes('/'+pos));
+  const round = getRound();
+  const avail = p => !STATE.drafted.has(p.name);
+  const noPros = p => !p.prosp && (p.hkb||0) >= 500;
+
+  const has = pos => my.some(p => p.pos===pos||p.pos.startsWith(pos+'/')||p.pos.includes('/'+pos));
   const ofCount = my.filter(p => p.pos==='OF'||p.pos.startsWith('OF/')).length;
-  GAP_TRACKER['C']  = has('C')        ? 0 : GAP_TRACKER['C']  + 1;
-  GAP_TRACKER['1B'] = has('1B')       ? 0 : GAP_TRACKER['1B'] + 1;
-  GAP_TRACKER['2B'] = has('2B')       ? 0 : GAP_TRACKER['2B'] + 1;
-  GAP_TRACKER['3B'] = has('3B')       ? 0 : GAP_TRACKER['3B'] + 1;
-  GAP_TRACKER['SS'] = has('SS')       ? 0 : GAP_TRACKER['SS'] + 1;
-  GAP_TRACKER['OF'] = ofCount >= 1    ? 0 : GAP_TRACKER['OF'] + 1;
+
+  const gaps = [];
+  const posStates = {
+    SS:   !has('SS'),
+    C:    !has('C'),
+    '1B': !has('1B'),
+    '3B': !has('3B'),
+    '2B': !has('2B'),
+    OF:   ofCount < 1,
+  };
+
+  for (const [pos, isEmpty] of Object.entries(posStates)) {
+    if (!isEmpty) continue;
+    const thresh = POS_URGENCY[pos];
+    if (!thresh || round < thresh.warn) continue;
+
+    const urgency = round >= thresh.force ? 'force' : 'warn';
+    const pool = STATE.players.filter(p => avail(p) && noPros(p) &&
+      (p.pos===pos||p.pos.startsWith(pos+'/')||p.pos.includes('/'+pos))
+    ).sort((a,b)=>(b.hkb||0)-(a.hkb||0));
+
+    if (pool.length) gaps.push({ pos, urgency, best: pool[0], round: thresh.force });
+  }
+
+  // Sort: force > warn, then by force round (most urgent first)
+  gaps.sort((a,b) => {
+    if (a.urgency !== b.urgency) return a.urgency==='force' ? -1 : 1;
+    return a.round - b.round;
+  });
+  return gaps;
 }
+
+// Keep updateGapTracker as a no-op — replaced by getPosGaps()
+function updateGapTracker() {}
+const GAP_TRACKER = {};
 
 function getTakeRecommendation() {
   if (!STATE.players.length) return null;
@@ -1647,18 +1693,27 @@ function getTakeRecommendation() {
   });
   const bda = bdaPool.filter(p=>(p.age||99)<=32&&(p.hkb||0)>500&&!p.prosp)[0]||bdaPool[0];
 
-  // ── PRIORITY 1: Force-fill positions empty GAP_GRACE_PICKS ────────
-  updateGapTracker();
-  const urgentGaps = Object.entries(GAP_TRACKER)
-    .filter(([,n])=>n>=C.GAP_GRACE_PICKS)
-    .sort((a,b)=>b[1]-a[1]);
-  for (const [pos] of urgentGaps) {
-    const best = poolH.find(p=>p.pos===pos||p.pos.startsWith(pos+'/')||p.pos.includes('/'+pos));
-    if (best) return {
-      player:best, tag:`FILL ${pos}`, color:'var(--red)',
-      reason:`${pos} empty ${GAP_TRACKER[pos]} picks — free losses every week. Non-negotiable fill.`,
+  // ── PRIORITY 0: Round 1 — always best elite hitter, never SP ─────
+  // In round 1 your pick is too valuable to spend on a pitcher.
+  // The dynasty window on a 25-year-old hitter outlasts any SP.
+  if (round === 1) {
+    const eliteH = bdaPool.filter(p=>p.type==='H'&&(p.hkb||0)>=4000&&!p.prosp)[0]
+                || bdaPool.filter(p=>p.type==='H'&&!p.prosp)[0];
+    if (eliteH) return {
+      player:eliteH, tag:'R1 · BDA', color:'var(--accent)',
+      reason:`Round 1 rule: always best elite hitter. HKB ${fmtK(eliteH.hkb||0)} · Age ${eliteH.age} · ${eliteH.pos}. SPs can wait — dynasty windows can't.`,
     };
   }
+
+  // ── PRIORITY 1: Force-fill urgent positional gaps ─────────────────
+  // Uses round-based thresholds — not triggered until position
+  // genuinely dries up. Never fills with a prospect.
+  const gaps = getPosGaps();
+  const forceGap = gaps.find(g=>g.urgency==='force');
+  if (forceGap) return {
+    player:forceGap.best, tag:`FILL ${forceGap.pos}`, color:'var(--red)',
+    reason:`${forceGap.pos} still empty in round ${round} — costing you category points every week. Non-negotiable fill.`,
+  };
 
   // ── PRIORITY 2: Ace SP if none ────────────────────────────────────
   if (!hasAce && aces.length && round <= 9) return {
@@ -1812,56 +1867,54 @@ function getWarRoomAdvice() {
   // Win-now: care about immediate contributors (age ≤32, hkb ≥1500)
   const isContributor = p => (p.age||99) <= 32 && (p.hkb||0) >= 1500 && !p.prosp;
 
+  // Non-prospect hitter filter — never suggest a prospect to fill a starting slot
+  const noPros = p => !p.prosp && (p.hkb||0) >= 500;
+
   // ── Available pools ───────────────────────────────────────────────
+  const C = CONSTITUTION;
   const A = {
     sp:       STATE.players.filter(p => p.type==='SP' && avail(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
-    rp:       STATE.players.filter(p => p.type==='RP' && avail(p) && (p.stat5||0)>=30).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
+    // Closers in advice bar use same quality gates as TAKE engine
+    rp:       STATE.players.filter(p => p.type==='RP' && avail(p)
+                && (p.stat5||0)>=C.CLOSER_SVH_MIN
+                && (p.stat2||99)<=C.CLOSER_ERA_MAX
+                && (p.stat3||99)<=C.CLOSER_WHIP_MAX).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
     hitter:   STATE.players.filter(p => p.type==='H' && avail(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
-    youngH:   STATE.players.filter(p => p.type==='H' && avail(p) && (p.age||99)<=28).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
-    eliteH:   STATE.players.filter(p => p.type==='H' && avail(p) && (p.hkb||0)>=4000).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
+    youngH:   STATE.players.filter(p => p.type==='H' && avail(p) && (p.age||99)<=28 && noPros(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
+    eliteH:   STATE.players.filter(p => p.type==='H' && avail(p) && (p.hkb||0)>=4000 && noPros(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
     contrib:  STATE.players.filter(p => avail(p) && isContributor(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
-    c1B:      STATE.players.filter(p => (p.pos==='1B'||p.pos.startsWith('1B/')) && avail(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
-    c2B:      STATE.players.filter(p => (p.pos==='2B'||p.pos.startsWith('2B/')||p.pos.includes('/2B')) && avail(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
-    c3B:      STATE.players.filter(p => (p.pos==='3B'||p.pos.startsWith('3B/')||p.pos.includes('/3B')) && avail(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
-    catcher:  STATE.players.filter(p => p.pos==='C' && avail(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
-    ss:       STATE.players.filter(p => (p.pos==='SS'||p.pos.startsWith('SS/')||p.pos.includes('/SS')) && avail(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
-    of:       STATE.players.filter(p => (p.pos==='OF'||p.pos.startsWith('OF/')) && avail(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
+    // Positional gap pools — prospects excluded, must have real HKB
+    c1B:      STATE.players.filter(p => (p.pos==='1B'||p.pos.startsWith('1B/')) && avail(p) && noPros(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
+    c2B:      STATE.players.filter(p => (p.pos==='2B'||p.pos.startsWith('2B/')||p.pos.includes('/2B')) && avail(p) && noPros(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
+    c3B:      STATE.players.filter(p => (p.pos==='3B'||p.pos.startsWith('3B/')||p.pos.includes('/3B')) && avail(p) && noPros(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
+    catcher:  STATE.players.filter(p => p.pos==='C' && avail(p) && noPros(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
+    ss:       STATE.players.filter(p => (p.pos==='SS'||p.pos.startsWith('SS/')||p.pos.includes('/SS')) && avail(p) && noPros(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
+    of:       STATE.players.filter(p => (p.pos==='OF'||p.pos.startsWith('OF/')) && avail(p) && noPros(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
     youngSP:  STATE.players.filter(p => p.type==='SP' && avail(p) && (p.age||99)<=27).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
     prosp:    STATE.players.filter(p => p.prosp && avail(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
-    youngAll: STATE.players.filter(p => avail(p) && (p.age||99)<=23).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
+    youngAll: STATE.players.filter(p => avail(p) && (p.age||99)<=23 && noPros(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
   };
 
   const nm  = p => p ? `${p.name} (${p.age}, ${p.pos})` : '—';
   const hk  = p => p && p.hkb ? ` · HKB ${fmtK(p.hkb)}` : '';
 
   // ══════════════════════════════════════════════════════════════════
-  // POSITIONAL COMPLETENESS — runs every round, highest priority
-  // An empty starting slot is always an emergency in win-now mode,
-  // and escalates to critical after round 8 in dynasty mode.
+  // POSITIONAL COMPLETENESS — uses round-based thresholds
   // ══════════════════════════════════════════════════════════════════
-  const posGaps = [];
-  if (!has1B && A.c1B.length)     posGaps.push({ pos:'1B', pool:A.c1B,    icon:'🚨', label:'NO 1B' });
-  if (!hasSS && A.ss.length)      posGaps.push({ pos:'SS', pool:A.ss,     icon:'🚨', label:'NO SS' });
-  if (!has3B && A.c3B.length && round >= 4) posGaps.push({ pos:'3B', pool:A.c3B, icon:'⚠️', label:'NO 3B' });
-  if (!has2B && A.c2B.length && round >= 4) posGaps.push({ pos:'2B', pool:A.c2B, icon:'⚠️', label:'NO 2B' });
-  if (!hasC  && A.catcher.length) posGaps.push({ pos:'C',  pool:A.catcher, icon:'⚠️', label:'NO C' });
-  if (ofCount < 1 && A.of.length) posGaps.push({ pos:'OF', pool:A.of,     icon:'⚠️', label:'NO OF' });
+  const gaps = getPosGaps();
+  const forceGap = gaps.find(g => g.urgency === 'force');
+  const warnGap  = gaps.find(g => g.urgency === 'warn');
+  const gapThreshold = winNow ? 'warn' : 'force'; // win-now warns earlier
 
-  // In win-now mode, gap threshold is immediate (round 1+)
-  // In dynasty mode, gaps become critical after round 6
-  const gapThreshold = winNow ? 1 : 6;
-
-  if (posGaps.length && round >= gapThreshold) {
-    const gap = posGaps[0];
-    const urgency = (winNow || round >= 10) ? 'var(--red)' : 'var(--orange)';
-    const top = gap.pool[0];
-    advices.push({ color: urgency, icon: gap.icon,
-      msg: `${gap.label} — Starting slot empty, scoring 0 every week. Fill now: ${nm(top)}${hk(top)}` });
-    if (posGaps.length > 1) {
-      const gap2 = posGaps[1];
-      advices.push({ color:'var(--orange)', icon:'⚠️',
-        msg:`Also ${gap2.label} — ${nm(gap2.pool[0])}${hk(gap2.pool[0])}` });
-    }
+  const activeGap = winNow ? (forceGap || warnGap) : forceGap;
+  if (activeGap) {
+    const urgency = activeGap.urgency === 'force' ? 'var(--red)' : 'var(--orange)';
+    const icon    = activeGap.urgency === 'force' ? '🚨' : '⚠️';
+    advices.push({ color: urgency, icon,
+      msg: `${activeGap.urgency==='force'?'MUST-FILL':'SOON'}: NO ${activeGap.pos} — ${nm(activeGap.best)}${hk(activeGap.best)}` });
+    const secondGap = gaps.find(g => g !== activeGap);
+    if (secondGap) advices.push({ color:'var(--orange)', icon:'⚠️',
+      msg:`Also no ${secondGap.pos} — ${nm(secondGap.best)}${hk(secondGap.best)}` });
     return advices.slice(0,2);
   }
 
@@ -2011,6 +2064,14 @@ function renderAdviceBar() {
   const bar = document.getElementById('adviceBar');
   if (!bar) return;
   if (!STATE.players.length) { bar.innerHTML = ''; return; }
+
+  // When it's your pick, TAKE card is the single source of truth.
+  // Suppress the advice bar to eliminate conflicting signals.
+  if (isMyPick(STATE.currentPick)) {
+    bar.innerHTML = '';
+    return;
+  }
+
   const advices = getWarRoomAdvice();
   bar.innerHTML = advices.map(a =>
     `<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--surface2);
@@ -2018,233 +2079,6 @@ function renderAdviceBar() {
       <span style="font-size:18px;flex-shrink:0">${a.icon}</span>
       <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:${a.color};
         font-weight:600;letter-spacing:0.3px;line-height:1.4">${a.msg}</span>
-    </div>`
-  ).join('');
-}
-function getWarRoomAdvice() {
-  const my = STATE.myDrafted;
-  const round = getRound();
-  const pick  = STATE.currentPick;
-  const avail = p => !STATE.drafted.has(p.name);
-  const advices = [];
-
-  // ── Roster inventory ──────────────────────────────────────────────
-  const sps         = my.filter(p => p.type === 'SP');
-  const rps         = my.filter(p => p.type === 'RP');
-  const hitters     = my.filter(p => p.type === 'H');
-  const prospects   = my.filter(p => p.prosp);
-  const hasAce      = sps.some(p => (p.hkb||0) >= 4500 || (p.dynZ||0) > 0.6);
-  const closers     = rps.filter(p => (p.stat5||0) >= 30);
-  const hasC        = my.some(p => p.pos === 'C');
-  const hasSS       = my.some(p => p.pos === 'SS' || p.pos.startsWith('SS/'));
-  const has2B       = my.some(p => p.pos === 'SS' || ['2B','2B/SS','SS/2B','2B/3B'].some(x => p.pos.startsWith(x)));
-  const ofCount     = my.filter(p => p.pos === 'OF' || p.pos.startsWith('OF/')).length;
-  const hasProspect = prospects.length > 0;
-  const avgAgeMyTeam = my.length ? my.reduce((s,p)=>s+(p.age||27),0)/my.length : 0;
-
-  // ── Available pools (by HKB desc) ─────────────────────────────────
-  const A = {
-    sp:      STATE.players.filter(p => p.type==='SP' && avail(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
-    rp:      STATE.players.filter(p => p.type==='RP' && avail(p) && (p.stat5||0)>=30).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
-    hitter:  STATE.players.filter(p => p.type==='H' && avail(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
-    youngH:  STATE.players.filter(p => p.type==='H' && avail(p) && (p.age||99)<=28).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
-    eliteH:  STATE.players.filter(p => p.type==='H' && avail(p) && (p.hkb||0)>=4000).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
-    catcher: STATE.players.filter(p => p.pos==='C' && avail(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
-    ss:      STATE.players.filter(p => (p.pos==='SS'||p.pos.startsWith('SS/')) && avail(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
-    youngSP: STATE.players.filter(p => p.type==='SP' && avail(p) && (p.age||99)<=27).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
-    prosp:   STATE.players.filter(p => p.prosp && avail(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
-    youngAll:STATE.players.filter(p => avail(p) && (p.age||99)<=23).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
-    oldSP:   sps.filter(p => (p.age||0)>=30),
-  };
-
-  const name = p => p ? `${p.name} (${p.age}, ${p.pos})` : '—';
-  const hkb  = p => p && p.hkb ? ` · HKB ${fmtK(p.hkb)}` : '';
-
-  // ══════════════════════════════════════════════════════════════════
-  // ROUND 1 — Picks 1-12: Elite youth first. Never reach for aging SP.
-  // ══════════════════════════════════════════════════════════════════
-  if (round === 1) {
-    // Red flag: any suggestion of aging SP when elite young hitters available
-    if (A.eliteH.length) {
-      const topH = A.eliteH[0];
-      const topSP = A.sp[0];
-      if (topSP && (topSP.age||0) >= 29 && (topH.age||0) <= 28 && (topH.hkb||0) >= (topSP.hkb||0) * 0.8) {
-        advices.push({ color:'var(--red)', icon:'🚨',
-          msg:`R1 RULE — Never take aging SP over elite young hitter. Take ${name(topH)}${hkb(topH)} over ${topSP.name} (age ${topSP.age})` });
-      } else {
-        advices.push({ color:'var(--accent)', icon:'🎯',
-          msg:`R1 BPA — Best available: ${name(topH)}${hkb(topH)}. Prioritize age ≤28 with 6+ year window.` });
-      }
-    }
-    // Always flag if SS/elite youth still on board
-    if (A.ss.length && (A.ss[0].hkb||0) >= 4000) {
-      advices.push({ color:'var(--blue)', icon:'⚡',
-        msg:`ELITE SS AVAILABLE — ${name(A.ss[0])}${hkb(A.ss[0])} is franchise-level. Premium position.` });
-    }
-    return advices.slice(0,2);
-  }
-
-  // ══════════════════════════════════════════════════════════════════
-  // ROUNDS 2-3 — BPA + scarcity alerts. No closers yet.
-  // ══════════════════════════════════════════════════════════════════
-  if (round <= 3) {
-    if (!hasSS && A.ss.length) {
-      advices.push({ color:'var(--red)', icon:'🚨',
-        msg:`SS SCARCITY — Thinnest position in dynasty. Take ${name(A.ss[0])}${hkb(A.ss[0])} now.` });
-    }
-    if (!hasC && A.catcher.length && round === 3) {
-      advices.push({ color:'var(--orange)', icon:'⚠️',
-        msg:`CATCHER WINDOW CLOSING — ${name(A.catcher[0])}${hkb(A.catcher[0])} is best available. Only 2-3 worth owning.` });
-    }
-    if (A.youngH.length && !advices.length) {
-      advices.push({ color:'var(--accent)', icon:'🎯',
-        msg:`R2-3 BPA — Best young hitter available: ${name(A.youngH[0])}${hkb(A.youngH[0])}. Stack youth.` });
-    }
-    if (A.eliteH.length && A.sp.length && (A.sp[0].age||0) >= 30) {
-      advices.push({ color:'var(--yellow)', icon:'⚠️',
-        msg:`AVOID AGING SP IN R2-3 — ${A.sp[0].name} is ${A.sp[0].age}. Take ${A.eliteH[0].name} instead.` });
-    }
-    return advices.slice(0,2);
-  }
-
-  // ══════════════════════════════════════════════════════════════════
-  // ROUNDS 4-6 — Rotation + first closer. Scarcity escalates.
-  // ══════════════════════════════════════════════════════════════════
-  if (round <= 6) {
-    if (!hasAce && A.sp.length) {
-      advices.push({ color:'var(--red)', icon:'🚨',
-        msg:`SECURE AN ACE — No elite SP yet. ${name(A.sp[0])}${hkb(A.sp[0])} is best available rotation piece.` });
-    }
-    if (!hasSS && A.ss.length) {
-      advices.push({ color:'var(--red)', icon:'🚨',
-        msg:`NO SHORTSTOP — Critical gap. ${name(A.ss[0])}${hkb(A.ss[0])} — last chance at premium SS.` });
-    }
-    if (!hasC && round >= 5 && A.catcher.length) {
-      advices.push({ color:'var(--orange)', icon:'⚠️',
-        msg:`DRAFT A CATCHER NOW — ${name(A.catcher[0])}${hkb(A.catcher[0])} — catcher pool almost gone.` });
-    }
-    if (closers.length === 0 && round >= 5 && A.rp.length) {
-      advices.push({ color:'var(--green)', icon:'🔒',
-        msg:`FIRST CLOSER — Start SV+H stack. ${name(A.rp[0])} · ${A.rp[0].stat5} SVH projected.` });
-    }
-    if (hasAce && hasSS && !advices.length) {
-      advices.push({ color:'var(--accent)', icon:'🎯',
-        msg:`R4-6 BPA — Spine secured. Best available: ${name(A.hitter[0]||A.sp[0])}${hkb(A.hitter[0]||A.sp[0])}.` });
-    }
-    return advices.slice(0,2);
-  }
-
-  // ══════════════════════════════════════════════════════════════════
-  // ROUNDS 7-10 — Closer hunting window. Fill gaps.
-  // ══════════════════════════════════════════════════════════════════
-  if (round <= 10) {
-    const closersNeeded = Math.max(0, 6 - closers.length); // 2 RP + 4 P-flex
-    if (closersNeeded >= 4 && A.rp.length) {
-      advices.push({ color:'var(--red)', icon:'🚨',
-        msg:`SV+H EMERGENCY — Only ${closers.length}/6 closers. Take ${name(A.rp[0])} · ${A.rp[0].stat5} SVH. Run on closers coming.` });
-    } else if (closersNeeded >= 2 && A.rp.length) {
-      advices.push({ color:'var(--green)', icon:'🔒',
-        msg:`CLOSER WINDOW — Need ${closersNeeded} more SV+H arms. ${name(A.rp[0])} · ${A.rp[0].stat5} SVH available.` });
-    }
-    if (!hasC && A.catcher.length) {
-      advices.push({ color:'var(--red)', icon:'🚨',
-        msg:`NO CATCHER — Major roster hole. Take ${name(A.catcher[0])}${hkb(A.catcher[0])} immediately.` });
-    }
-    if (sps.length < 2 && A.youngSP.length) {
-      advices.push({ color:'var(--purple)', icon:'💪',
-        msg:`BUILD ROTATION — Only ${sps.length} SP. ${name(A.youngSP[0])}${hkb(A.youngSP[0])} — young arm with upside.` });
-    }
-    if (ofCount < 3 && A.hitter.filter(p=>p.pos==='OF'||p.pos.startsWith('OF/')).length) {
-      const topOF = A.hitter.filter(p=>p.pos==='OF'||p.pos.startsWith('OF/'))[0];
-      advices.push({ color:'var(--yellow)', icon:'🏃',
-        msg:`OF DEPTH — Only ${ofCount}/3 outfield spots filled. Consider ${name(topOF)}${hkb(topOF)}.` });
-    }
-    if (!advices.length) {
-      advices.push({ color:'var(--accent)', icon:'🎯',
-        msg:`R7-10 BPA — ${name(A.hitter[0]||A.sp[0])}${hkb(A.hitter[0]||A.sp[0])}. Keep stacking SV+H arms.` });
-    }
-    return advices.slice(0,2);
-  }
-
-  // ══════════════════════════════════════════════════════════════════
-  // ROUNDS 11-15 — Depth, upside, prospect stash.
-  // ══════════════════════════════════════════════════════════════════
-  if (round <= 15) {
-    const closersNeeded = Math.max(0, 6 - closers.length);
-    if (closersNeeded > 0 && A.rp.length) {
-      advices.push({ color:'var(--green)', icon:'🔒',
-        msg:`SV+H DEPTH — ${closersNeeded} closer slot${closersNeeded>1?'s':''} still open. ${name(A.rp[0])} · ${A.rp[0].stat5} SVH.` });
-    }
-    if (!hasProspect && A.prosp.length) {
-      advices.push({ color:'var(--purple)', icon:'★',
-        msg:`STASH A PROSPECT — NA slot empty. ${name(A.prosp[0])}${hkb(A.prosp[0])} — dynasty upside pick.` });
-    }
-    if (avgAgeMyTeam >= 29) {
-      advices.push({ color:'var(--orange)', icon:'⚠️',
-        msg:`TEAM AGING — Avg age ${avgAgeMyTeam.toFixed(1)}. Target youth: ${name(A.youngAll[0])} to lower window floor.` });
-    }
-    const youngKArm = A.sp.find(p => (p.age||99)<=26 && (p.stat1||0)>=140);
-    if (youngKArm && sps.length < 4) {
-      advices.push({ color:'var(--purple)', icon:'💪',
-        msg:`YOUNG K-ARM — ${name(youngKArm)} · ${youngKArm.stat1}K projected. Dynasty upside pick.` });
-    }
-    if (!advices.length) {
-      const bpa = A.youngAll[0] || A.hitter[0];
-      advices.push({ color:'var(--accent)', icon:'🎯',
-        msg:`R11-15 UPSIDE HUNTING — ${name(bpa)}${hkb(bpa)}. Favor age ≤25 in late rounds.` });
-    }
-    return advices.slice(0,2);
-  }
-
-  // ══════════════════════════════════════════════════════════════════
-  // ROUNDS 16-23 — Pure lottery. Age ≤23 only. No old vets.
-  // ══════════════════════════════════════════════════════════════════
-  if (round <= 23) {
-    const lotteryArm = A.sp.find(p => (p.age||99)<=24);
-    const lotteryBat = A.hitter.find(p => (p.age||99)<=23);
-    const lotteryRP  = A.rp.find(p => (p.age||99)<=26);
-    const oldVetOnBoard = [...A.sp, ...A.hitter].find(p => (p.age||0)>=34);
-
-    if (oldVetOnBoard) {
-      advices.push({ color:'var(--red)', icon:'❌',
-        msg:`AVOID ${oldVetOnBoard.name} (age ${oldVetOnBoard.age}) — 0 dynasty value in R16+. Pure redraft player.` });
-    }
-    const closersNeeded = Math.max(0, 6 - closers.length);
-    if (closersNeeded > 0 && lotteryRP) {
-      advices.push({ color:'var(--green)', icon:'🔒',
-        msg:`HANDCUFF CLOSER — ${name(lotteryRP)} · ${lotteryRP.stat5} SVH projected. Young arm with save upside.` });
-    }
-    if (!hasProspect && A.prosp.length) {
-      advices.push({ color:'var(--purple)', icon:'★',
-        msg:`LAST CALL: PROSPECT STASH — ${name(A.prosp[0])}${hkb(A.prosp[0])} for your NA slot. Pure upside.` });
-    }
-    if (lotteryArm || lotteryBat) {
-      const pick = lotteryBat || lotteryArm;
-      advices.push({ color:'var(--blue)', icon:'🎰',
-        msg:`LOTTERY PICK — ${name(pick)}${hkb(pick)}. Age ≤24 only. This is dart throw territory — swing for upside.` });
-    }
-    if (!advices.length) {
-      advices.push({ color:'var(--text-muted)', icon:'🎰',
-        msg:`R${round} DART THROW — Prioritize age ≤24, high K-rate arms, or speed-only fliers. Zero value in 33+ vets.` });
-    }
-    return advices.slice(0,2);
-  }
-
-  return [{ color:'var(--accent)', icon:'🎯', msg:'Draft complete!' }];
-}
-
-function renderAdviceBar() {
-  const bar = document.getElementById('adviceBar');
-  if (!bar) return;
-  if (!STATE.players.length) {
-    bar.innerHTML = '';
-    return;
-  }
-  const advices = getWarRoomAdvice();
-  bar.innerHTML = advices.map(a =>
-    `<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--surface2);border-radius:8px;border-left:3px solid ${a.color};flex:1;min-width:0;border:1px solid rgba(46,46,74,0.6);border-left:3px solid ${a.color}">
-      <span style="font-size:18px;flex-shrink:0">${a.icon}</span>
-      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:${a.color};font-weight:600;letter-spacing:0.3px;line-height:1.4">${a.msg}</span>
     </div>`
   ).join('');
 }
