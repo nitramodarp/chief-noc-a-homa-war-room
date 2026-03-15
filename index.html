@@ -2595,9 +2595,12 @@ function getPosGaps() {
     p.pos==='OF'||p.pos.startsWith('OF/')||p.pos.includes('/OF')
   ).length;
 
-  const ofPool = STATE.players.filter(p => avail(p) && noPros(p) &&
+  // OF pool — don't require HKB (Robert Jr, Betts etc may be missing HKB)
+  // Use DYN Z > 0 as minimum quality bar instead
+  const ofPool = STATE.players.filter(p => avail(p) && !p.prosp &&
+    ((p.hkb||0) >= 400 || (p.dynZ||0) > 0.1) &&
     (p.pos==='OF'||p.pos.startsWith('OF/')||p.pos.includes('/OF'))
-  ).sort((a,b)=>(b.hkb||0)-(a.hkb||0));
+  ).sort((a,b) => ((b.hkb||0)||(b.dynZ||0)*1000) - ((a.hkb||0)||(a.dynZ||0)*1000));
 
   const gaps = [];
 
@@ -2652,7 +2655,10 @@ function getTakeRecommendation() {
 
   // ── Roster counts ─────────────────────────────────────────────────
   const mySPs   = my.filter(p => p.type==='SP' && !p.name.includes('(SP)'));
-  const myRPs   = my.filter(p => p.type==='RP');
+  // For closer counting, only count RPs that project for meaningful SV+H
+  // This prevents setup men from filling "closer" slots prematurely
+  const myRPs   = my.filter(p => p.type==='RP' && (p.stat5||0) >= 15);
+  const myAllRPs = my.filter(p => p.type==='RP'); // all RPs for non-closer logic
   const myProsp = my.filter(p => p.prosp);
   const spCount = mySPs.length;
   const rpCount = myRPs.length;
@@ -2934,7 +2940,7 @@ function getWarRoomAdvice() {
   const has2B     = my.some(p => p.pos === '2B' || p.pos.startsWith('2B/') || p.pos.includes('/2B'));
   const has3B     = my.some(p => p.pos === '3B' || p.pos.startsWith('3B/') || p.pos.includes('/3B'));
   const hasSS     = my.some(p => p.pos === 'SS' || p.pos.startsWith('SS/') || p.pos.includes('/SS'));
-  const ofCount   = my.filter(p => p.pos === 'OF' || p.pos.startsWith('OF/')).length;
+  const ofCount   = my.filter(p => p.pos === 'OF' || p.pos.startsWith('OF/') || p.pos.includes('/OF')).length;
   const hasProsp  = prospects.length > 0;
   const avgAge    = my.length ? my.reduce((s,p) => s+(p.age||27),0)/my.length : 0;
 
