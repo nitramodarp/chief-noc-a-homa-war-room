@@ -369,16 +369,20 @@
   ═══════════════════════════════════════════════════ */
   @media (max-width: 768px) {
 
-    /* Floating TAKE bar — sticks to bottom when it's your pick */
+    /* Floating TAKE bar — sticks to TOP when it's your pick */
     #mobileTakeBar {
-      position: fixed; bottom: 0; left: 0; right: 0; z-index: 200;
+      position: fixed; top: 0; left: 0; right: 0; z-index: 200;
       background: linear-gradient(135deg, var(--accent), var(--purple));
-      padding: 12px 16px; display: flex !important;
+      padding: 10px 16px; display: flex !important;
       align-items: center; justify-content: space-between;
-      gap: 12px; box-shadow: 0 -4px 24px rgba(0,212,255,0.4);
+      gap: 12px; box-shadow: 0 4px 24px rgba(0,212,255,0.4);
       animation: pulse 1.5s ease-in-out infinite;
     }
     #mobileTakeBar.hidden { display: none !important; }
+
+    /* Push content down when TAKE bar is showing */
+    body.take-visible .header { top: 52px; }
+    body.take-visible .nav { position: sticky; top: calc(48px + 52px); z-index: 99; }
 
     /* Compact header */
     .header { height: 48px; padding: 0 12px; }
@@ -397,8 +401,9 @@
     .nav { padding: 0 8px; gap: 0; }
     .nav-tab { padding: 8px 10px; font-size: 8px; letter-spacing: 0.5px; }
 
-    /* Main padding */
-    .main { padding: 8px 8px 80px 8px; } /* bottom pad for floating bar */
+    /* Main padding — top pad when TAKE bar showing, normal otherwise */
+    .main { padding: 8px 8px 16px 8px; }
+    body.take-visible .main { padding-top: 60px; }
 
     /* Single column always on mobile */
     .dash-layout { grid-template-columns: 1fr !important; }
@@ -2329,14 +2334,14 @@ function renderTakeCard() {
   // Hide both if not your turn
   if (!myTurn || !STATE.players.length) {
     card.classList.remove('visible');
-    if (mBar) mBar.classList.add('hidden');
+    if (mBar) { mBar.classList.add('hidden'); document.body.classList.remove('take-visible'); }
     return;
   }
 
   const rec = getTakeRecommendation();
   if (!rec) {
     card.classList.remove('visible');
-    if (mBar) mBar.classList.add('hidden');
+    if (mBar) { mBar.classList.add('hidden'); document.body.classList.remove('take-visible'); }
     return;
   }
 
@@ -2363,9 +2368,9 @@ function renderTakeCard() {
   // Mobile floating bar
   if (mBar) {
     mBar.classList.remove('hidden');
+    document.body.classList.add('take-visible');
     if (mName) mName.textContent = p.name;
     if (mTag)  mTag.textContent  = `${rec.tag} · ${p.pos}${p.age ? ' · Age '+p.age : ''}`;
-    // Store name on mobile take button too
     const mBtn = mBar.querySelector('button');
     if (mBtn) mBtn.onclick = () => {
       if (STATE.players.find(x=>x.name===p.name)) {
