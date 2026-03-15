@@ -1,269 +1,2787 @@
-// ============================================================
-// HKB_Scraper.gs — HarryKnowsBall Dynasty Value Scraper
-// Populates column Y (HKB_VALUE) in your PROJECTIONS sheet
-//
-// SETUP:
-//   1. Open your Google Sheet → Extensions → Apps Script
-//   2. Paste this file, Save, Run scrapeHKBValues
-//   3. Authorize when prompted
-//   4. Optionally run createWeeklyTrigger for auto-updates
-// ============================================================
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chief Noc-A-Homa · Dynasty Baseball War Room 2026</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #07070f;
+    --surface: #0e0e1c;
+    --surface2: #161628;
+    --surface3: #1e1e38;
+    --border: #2e2e4a;
+    --accent: #00d4ff;
+    --accent2: #ff6b35;
+    --gold: #ffd700;
+    --text: #eaeaf4;
+    --text-dim: #9090b0;
+    --text-muted: #60607a;
+    --red: #ff4444;
+    --orange: #ff8c42;
+    --yellow: #ffd700;
+    --green: #4cff91;
+    --blue: #4ca9ff;
+    --purple: #b44cff;
+    --young: #4ca9ff;
+    --peak: #4cff91;
+    --aging: #ffd700;
+    --sell: #ff4444;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    background-image: radial-gradient(ellipse 90% 50% at 15% 0%, #0e0e24 0%, transparent 70%),
+                      radial-gradient(ellipse 60% 40% at 85% 100%, #0a0a20 0%, transparent 60%);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  .mono { font-family: 'IBM Plex Mono', monospace; }
+  .bebas { font-family: 'Bebas Neue', cursive; }
+  .muted { color: var(--text-muted); }
 
-const SHEET_NAME = 'PROJECTIONS';
-const HKB_COL    = 25;  // Column Y
-const NAME_COL   = 2;   // Column B = player name
-const HEADER_ROW = 1;
+  /* LOADING */
+  #loading-overlay {
+    position: fixed; inset: 0; background: var(--bg);
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; z-index: 1000; gap: 20px;
+  }
+  .loading-logo {
+    font-family: 'Bebas Neue', cursive; font-size: 52px; letter-spacing: 6px;
+    background: linear-gradient(135deg, var(--accent), var(--purple));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  .loading-sub { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--text-muted); letter-spacing: 2px; text-transform: uppercase; }
+  .loading-bar-wrap { width: 320px; height: 2px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .loading-bar { height: 100%; background: linear-gradient(90deg, var(--accent), var(--purple)); width: 0%; transition: width 0.4s ease; }
+  .loading-status { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--text-muted); letter-spacing: 1px; }
 
-// Position and level tabs — each returns top ~50 for that filter
-// Union of all tabs covers the full player pool
-const HKB_URLS = [
-  'https://harryknowsball.com/rankings',
-  'https://harryknowsball.com/rankings?positions=C',
-  'https://harryknowsball.com/rankings?positions=1B',
-  'https://harryknowsball.com/rankings?positions=2B',
-  'https://harryknowsball.com/rankings?positions=3B',
-  'https://harryknowsball.com/rankings?positions=SS',
-  'https://harryknowsball.com/rankings?positions=OF',
-  'https://harryknowsball.com/rankings?positions=SP',
-  'https://harryknowsball.com/rankings?positions=RP',
-  'https://harryknowsball.com/rankings?level=Prospects',
-  'https://harryknowsball.com/rankings?level=MLB',
-  'https://harryknowsball.com/rankings?level=MiLB',
+  /* HEADER */
+  .header {
+    background: linear-gradient(135deg, #0a0a0f 0%, #12121a 50%, #0a0a1f 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px; height: 64px;
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 100;
+    backdrop-filter: blur(10px);
+  }
+  .header-left { display: flex; align-items: center; gap: 20px; }
+  .header-logo {
+    font-family: 'Bebas Neue', cursive; font-size: 26px; letter-spacing: 3px;
+    background: linear-gradient(135deg, var(--accent), var(--purple));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  .header-meta { font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--text-muted); letter-spacing: 1px; line-height: 1.6; }
+  .header-right { display: flex; align-items: center; gap: 12px; }
+  .pick-counter { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 6px 14px; text-align: center; }
+  .pick-num { font-family: 'Bebas Neue', cursive; font-size: 24px; color: var(--accent); line-height: 1; }
+  .pick-lbl { font-family: 'IBM Plex Mono', monospace; font-size: 8px; color: var(--text-muted); letter-spacing: 1px; text-transform: uppercase; }
+  .your-pick-banner {
+    background: linear-gradient(135deg, rgba(0,212,255,0.15), rgba(180,76,255,0.15));
+    border: 1px solid var(--accent); border-radius: 8px;
+    padding: 6px 14px; font-family: 'Bebas Neue', cursive;
+    font-size: 16px; letter-spacing: 2px; color: var(--accent);
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%, 100% { opacity: 1; box-shadow: 0 0 8px rgba(0,212,255,0.3); } 50% { opacity: 0.7; box-shadow: 0 0 20px rgba(0,212,255,0.6); } }
+  .sync-btn {
+    background: linear-gradient(135deg, var(--accent), var(--purple));
+    border: none; border-radius: 6px; color: #000;
+    font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 600;
+    letter-spacing: 1px; padding: 8px 16px; cursor: pointer;
+    text-transform: uppercase; transition: opacity 0.2s;
+  }
+  .sync-btn:hover { opacity: 0.85; }
+  .sync-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .reset-btn {
+    background: none; border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text-muted); font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px; letter-spacing: 1px; padding: 7px 12px; cursor: pointer;
+    text-transform: uppercase; transition: all 0.2s;
+  }
+  .reset-btn:hover { border-color: var(--red); color: var(--red); }
+  .last-sync { font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--text-muted); }
+
+  /* NAV */
+  .nav {
+    display: flex; gap: 2px; padding: 0 24px;
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+  }
+  .nav-tab {
+    padding: 12px 20px; font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px; font-weight: 500; letter-spacing: 1px;
+    text-transform: uppercase; color: var(--text-muted);
+    cursor: pointer; border-bottom: 2px solid transparent;
+    white-space: nowrap; transition: all 0.2s;
+    background: none; border-top: none; border-left: none; border-right: none;
+  }
+  .nav-tab:hover { color: var(--text); }
+  .nav-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* MAIN */
+  .main { padding: 20px 24px; max-width: 1600px; margin: 0 auto; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* CARD / PANEL */
+  .panel {
+    background: linear-gradient(160deg, #111122 0%, var(--surface) 40%);
+    border: 1px solid var(--border); border-radius: 12px; padding: 16px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.03) inset;
+    margin-bottom: 16px;
+  }
+  .panel-title {
+    font-family: 'Bebas Neue', cursive; font-size: 18px; letter-spacing: 2px;
+    color: var(--accent); margin-bottom: 14px;
+    display: flex; align-items: center; gap: 8px;
+    text-shadow: 0 0 20px rgba(0,212,255,0.3);
+  }
+
+  /* DASHBOARD LAYOUT */
+  .dash-layout { display: grid; grid-template-columns: 1fr 300px; gap: 16px; align-items: start; }
+  @media (max-width: 1100px) { .dash-layout { grid-template-columns: 1fr; } }
+
+  /* STAT CARDS */
+  .stat-grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
+  .stat-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 12px; }
+  @media (max-width: 700px) { .stat-grid-4 { grid-template-columns: repeat(2, 1fr); } }
+  .stat-card {
+    background: linear-gradient(160deg, #131326 0%, var(--surface2) 60%);
+    border: 1px solid var(--border); border-radius: 10px; padding: 12px;
+    text-align: center; box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+  }
+  .stat-val { font-family: 'Bebas Neue', cursive; font-size: 30px; letter-spacing: 2px; line-height: 1; text-shadow: 0 0 16px currentColor; }
+  .stat-lbl { font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: 1px; color: var(--text-muted); text-transform: uppercase; margin-top: 3px; }
+
+  /* FILTERS */
+  .filter-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; align-items: center; }
+  .filter-btn {
+    padding: 5px 14px; font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+    font-weight: 500; letter-spacing: 0.5px;
+    border: 1px solid var(--border); border-radius: 20px; cursor: pointer;
+    background: var(--surface2); color: var(--text-muted); transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .filter-btn:hover { color: var(--text); border-color: var(--text-muted); }
+  .filter-btn.active { background: rgba(0,212,255,0.12); color: var(--accent); border-color: var(--accent); }
+  .filter-btn.warn { border-color: rgba(255,68,68,0.4); color: var(--text-muted); }
+  .filter-btn.warn:hover { border-color: var(--red); color: var(--red); }
+  .search-wrap { position: relative; margin-bottom: 10px; }
+  .search-input {
+    width: 100%; background: var(--surface3); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text); font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 14px; padding: 10px 14px; outline: none; transition: border-color 0.2s;
+  }
+  .search-input:focus { border-color: var(--accent); }
+  .search-input::placeholder { color: var(--text-muted); }
+
+  /* TABLE */
+  .table-wrap { overflow-x: auto; overflow-y: auto; max-height: calc(100vh - 310px); }
+  .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .data-table th {
+    font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 1px;
+    text-transform: uppercase; color: var(--text-muted); padding: 9px 10px;
+    text-align: left; border-bottom: 1px solid var(--border);
+    white-space: nowrap; cursor: pointer; user-select: none;
+    position: sticky; top: 0; background: var(--surface); z-index: 2;
+    transition: color 0.15s;
+  }
+  .data-table th:hover { color: var(--accent); }
+  .data-table th.sorted { color: var(--accent); }
+  .data-table th.sorted::after { content: attr(data-dir); margin-left: 4px; font-size: 8px; }
+  .data-table td { padding: 9px 10px; border-bottom: 1px solid rgba(46,46,74,0.35); vertical-align: middle; }
+  .data-table tr:hover td { background: var(--surface2); }
+  .data-table tr.drafted-row td { opacity: 0.28; }
+  .data-table tr.my-drafted-row td { background: rgba(0,212,255,0.04); }
+  .data-table tr.on-clock-row { outline: 1px solid rgba(0,212,255,0.3); }
+  .data-table tr.on-clock-row td { background: rgba(0,212,255,0.04); }
+
+  /* POSITION PILLS */
+  .pos-pill {
+    display: inline-block; padding: 2px 7px; border-radius: 4px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 600;
+    letter-spacing: 0.5px; white-space: nowrap;
+  }
+  .pos-C    { background: rgba(0,212,255,0.15);  color: #00d4ff; }
+  .pos-1B   { background: rgba(76,255,145,0.15); color: #4cff91; }
+  .pos-2B   { background: rgba(76,255,145,0.15); color: #4cff91; }
+  .pos-3B   { background: rgba(255,140,66,0.15); color: #ff8c42; }
+  .pos-SS   { background: rgba(76,169,255,0.15); color: #4ca9ff; }
+  .pos-OF   { background: rgba(255,215,0,0.15);  color: #ffd700; }
+  .pos-DH   { background: rgba(255,107,53,0.15); color: #ff6b35; }
+  .pos-SP   { background: rgba(180,76,255,0.15); color: #b44cff; }
+  .pos-RP   { background: rgba(255,68,68,0.15);  color: #ff4444; }
+  .pos-UTIL { background: rgba(144,144,176,0.15);color: #9090b0; }
+  .pos-BN   { background: rgba(96,96,122,0.15);  color: #60607a; }
+  .pos-IL   { background: rgba(255,68,68,0.12);  color: #ff4444; }
+  .pos-NA   { background: rgba(180,76,255,0.12); color: #b44cff; }
+
+  /* ARCHETYPE BADGES */
+  .badge {
+    display: inline-block; padding: 1px 5px; border-radius: 3px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 8px; font-weight: 600;
+    letter-spacing: 0.5px; text-transform: uppercase;
+  }
+  .badge-young { background: rgba(76,169,255,0.15); color: #4ca9ff; border: 1px solid rgba(76,169,255,0.3); }
+  .badge-prime { background: rgba(76,255,145,0.15); color: #4cff91; border: 1px solid rgba(76,255,145,0.3); }
+  .badge-aging { background: rgba(255,215,0,0.15);  color: #ffd700; border: 1px solid rgba(255,215,0,0.3); }
+  .badge-sell  { background: rgba(255,68,68,0.15);  color: #ff4444; border: 1px solid rgba(255,68,68,0.3); }
+  .badge-prosp { background: rgba(180,76,255,0.15); color: #b44cff; border: 1px solid rgba(180,76,255,0.3); }
+  .badge-closer{ background: rgba(255,215,0,0.15);  color: #ffd700; border: 1px solid rgba(255,215,0,0.3); }
+
+  /* DELTA */
+  .delta-big-buy  { color: #4cff91; font-weight: 700; }
+  .delta-buy      { color: #9ee87a; font-weight: 600; }
+  .delta-neut     { color: var(--text-muted); }
+  .delta-sell     { color: #ff8c42; }
+  .delta-big-sell { color: #ff4444; font-weight: 700; }
+
+  /* DRAFT BUTTON */
+  .draft-btn {
+    padding: 3px 10px; font-family: 'IBM Plex Mono', monospace; font-size: 9px;
+    font-weight: 600; letter-spacing: 0.5px; border-radius: 4px; cursor: pointer;
+    border: 1px solid rgba(0,212,255,0.5); background: transparent;
+    color: var(--accent); transition: all 0.15s; white-space: nowrap;
+  }
+  .draft-btn:hover { background: rgba(0,212,255,0.12); }
+  .draft-btn.my-turn { border-color: var(--accent); background: rgba(0,212,255,0.15); animation: pulse 1.5s infinite; }
+  .undo-btn {
+    padding: 2px 6px; font-family: 'IBM Plex Mono', monospace; font-size: 9px;
+    border-radius: 4px; cursor: pointer; border: 1px solid var(--border);
+    background: transparent; color: var(--text-muted); transition: all 0.15s;
+  }
+  .undo-btn:hover { border-color: var(--red); color: var(--red); }
+
+  /* PICK PANEL */
+  .pick-panel { display: flex; flex-direction: column; gap: 12px; }
+  .pick-item {
+    display: flex; align-items: center; gap: 8px; padding: 6px 10px;
+    background: var(--surface2); border-radius: 6px;
+    border: 1px solid transparent; font-size: 11px; transition: all 0.2s;
+  }
+  .pick-item.your-turn { border-color: var(--accent); background: rgba(0,212,255,0.08); animation: pulse 1.5s infinite; }
+  .pick-item.my-pick   { border-color: rgba(0,212,255,0.3); background: rgba(0,212,255,0.04); }
+  .pick-item.used      { opacity: 0.45; }
+  .pick-item.future    { opacity: 0.6; }
+  .pick-rd { font-family: 'Bebas Neue', cursive; font-size: 18px; color: var(--text-muted); min-width: 22px; line-height: 1; }
+  .pick-rd.mine { color: var(--accent); }
+  .pick-ovr { font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--text-muted); min-width: 28px; }
+  .pick-name { flex: 1; font-size: 11px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+  .pick-name.empty { color: var(--text-muted); font-style: italic; font-weight: 400; }
+
+  /* ROSTER GRID */
+  .roster-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  @media (max-width: 600px) { .roster-grid-2 { grid-template-columns: 1fr; } }
+  .roster-slot {
+    display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+    background: var(--surface2); border-radius: 6px;
+    border-left: 3px solid var(--border); font-size: 11px; transition: border-color 0.2s;
+  }
+  .roster-slot.filled { border-left-color: rgba(0,212,255,0.5); }
+  .roster-slot.pflex  { border-left-color: rgba(76,255,145,0.5); }
+  .roster-slot.naslot { border-left-color: rgba(180,76,255,0.5); }
+  .slot-lbl { font-family: 'IBM Plex Mono', monospace; font-size: 9px; font-weight: 600; min-width: 38px; color: var(--text-muted); }
+  .slot-player { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-dim); }
+  .slot-player.filled { color: var(--text); font-weight: 500; }
+
+  /* TRADE */
+  .trade-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  @media (max-width: 700px) { .trade-grid { grid-template-columns: 1fr; } }
+  .trade-side { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+  .trade-header { font-family: 'Bebas Neue', cursive; font-size: 16px; letter-spacing: 2px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+  .trade-score { font-size: 22px; color: var(--accent); }
+  .trade-input-wrap { position: relative; margin-bottom: 8px; }
+  .trade-search {
+    width: 100%; background: var(--surface3); border: 1px solid var(--border);
+    border-radius: 6px; color: var(--text); font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 12px; padding: 8px 12px; outline: none; transition: border-color 0.2s;
+  }
+  .trade-search:focus { border-color: var(--accent); }
+  .trade-search::placeholder { color: var(--text-muted); }
+  .autocomplete-drop {
+    position: absolute; left: 0; right: 0; top: 100%; margin-top: 2px;
+    background: var(--surface3); border: 1px solid var(--border);
+    border-radius: 6px; max-height: 200px; overflow-y: auto;
+    z-index: 50; box-shadow: 0 8px 32px rgba(0,0,0,0.5); display: none;
+  }
+  .ac-item { padding: 7px 12px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-size: 11px; gap: 8px; }
+  .ac-item:hover { background: rgba(0,212,255,0.1); }
+  .trade-asset { display: flex; align-items: center; gap: 8px; padding: 7px 10px; background: var(--surface3); border-radius: 5px; margin-bottom: 4px; font-size: 11px; }
+  .remove-x { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 13px; padding: 0 2px; transition: color 0.15s; flex-shrink: 0; }
+  .remove-x:hover { color: var(--red); }
+  .trade-verdict { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 20px; text-align: center; }
+  .verdict-big { font-family: 'Bebas Neue', cursive; font-size: 36px; letter-spacing: 4px; }
+
+  /* PLACEHOLDER */
+  .placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 64px 24px; text-align: center; gap: 14px; }
+  .ph-icon { font-size: 48px; opacity: 0.25; }
+  .ph-title { font-family: 'Bebas Neue', cursive; font-size: 28px; letter-spacing: 3px; color: var(--text-muted); }
+  .ph-text { font-size: 13px; color: var(--text-muted); max-width: 420px; line-height: 1.7; }
+  .connect-btn {
+    background: linear-gradient(135deg, var(--accent), var(--purple));
+    border: none; border-radius: 8px; color: #000;
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 600;
+    letter-spacing: 1px; padding: 11px 24px; cursor: pointer; text-transform: uppercase; margin-top: 6px;
+  }
+
+  /* TOOLTIP */
+  [title] { cursor: help; }
+
+  /* TAKE BUTTON */
+  .take-card {
+    background: linear-gradient(135deg, rgba(0,212,255,0.08) 0%, rgba(180,76,255,0.08) 100%);
+    border: 2px solid var(--accent); border-radius: 12px; padding: 14px;
+    margin-bottom: 12px; display: none;
+  }
+  .take-card.visible { display: block; animation: pulse 1.5s ease-in-out infinite; }
+  .take-player-name {
+    font-family: 'Bebas Neue', cursive; font-size: 22px; letter-spacing: 2px;
+    color: var(--text); line-height: 1.1; margin: 6px 0 4px;
+  }
+  .take-reason {
+    font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--text-dim);
+    line-height: 1.5; margin-bottom: 10px;
+  }
+  .take-btn {
+    width: 100%; padding: 12px; font-family: 'Bebas Neue', cursive;
+    font-size: 22px; letter-spacing: 4px; border: none; border-radius: 8px;
+    cursor: pointer; color: #000;
+    background: linear-gradient(135deg, var(--accent), var(--purple));
+    transition: opacity 0.15s; box-shadow: 0 4px 20px rgba(0,212,255,0.3);
+  }
+  .take-btn:hover { opacity: 0.85; }
+  .take-btn:active { transform: scale(0.98); }
+  .take-meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 4px; }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: var(--surface); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+</style>
+</head>
+<body>
+
+<!-- LOADING OVERLAY -->
+<div id="loading-overlay">
+  <div class="loading-logo">Chief Noc-A-Homa</div>
+  <div class="loading-sub">Dynasty Baseball · War Room · 2026</div>
+  <div class="loading-bar-wrap"><div class="loading-bar" id="loadBar"></div></div>
+  <div class="loading-status" id="loadStatus">INITIALIZING...</div>
+  <button onclick="dismissOverlay()" style="margin-top:16px;background:none;border:1px solid #2e2e4a;border-radius:6px;color:#60607a;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:1px;padding:6px 16px;cursor:pointer;transition:all 0.2s" onmouseover="this.style.color='#eaeaf4'" onmouseout="this.style.color='#60607a'">SKIP ›</button>
+</div>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="header-left">
+    <div>
+      <div class="header-logo">⚾ Chief Noc-A-Homa</div>
+      <div class="header-meta">DYNASTY BASEBALL · 2026 WAR ROOM · YAHOO · 12 TEAMS · SNAKE · PICK 8</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div id="yourPickBanner" class="your-pick-banner" style="display:none">🎯 YOUR PICK</div>
+    <div class="pick-counter">
+      <div class="pick-num" id="hdrPickNum">1</div>
+      <div class="pick-lbl">Overall Pick</div>
+    </div>
+    <div style="text-align:right">
+      <button class="sync-btn" id="syncBtn" onclick="syncData()">⟳ SYNC</button>
+      <div class="last-sync" id="lastSync" style="margin-top:3px"></div>
+    </div>
+    <button class="reset-btn" onclick="resetDraft()">RESET DRAFT</button>
+  </div>
+</header>
+
+<!-- NAV -->
+<nav class="nav">
+  <button class="nav-tab active"  data-tab="dashboard"       onclick="setTab('dashboard')">Draft Board</button>
+  <button class="nav-tab"         data-tab="my-roster"       onclick="setTab('my-roster')">My Roster</button>
+  <button class="nav-tab"         data-tab="power-rankings"  onclick="setTab('power-rankings')">Power Rankings</button>
+  <button class="nav-tab"         data-tab="trade-analyzer"  onclick="setTab('trade-analyzer')">Trade Analyzer</button>
+  <button class="nav-tab"         data-tab="waivers"         onclick="setTab('waivers')">Waivers</button>
+  <button class="nav-tab"         data-tab="trade-finder"    onclick="setTab('trade-finder')">Trade Finder</button>
+</nav>
+
+<!-- MAIN CONTENT -->
+<main class="main">
+
+  <!-- ═══════════════ DRAFT BOARD ═══════════════ -->
+  <div class="tab-content active" id="tab-dashboard">
+    <div class="dash-layout">
+
+      <!-- LEFT: Player Board -->
+      <div>
+        <div class="panel" style="margin-bottom:0">
+          <!-- WIN-NOW TOGGLE + WAR ROOM ADVICE BAR -->
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap">
+            <div style="display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:3px 4px">
+              <button id="modeBtn0" onclick="setWinNowMode(false)"
+                style="padding:4px 12px;border-radius:16px;border:none;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:600;letter-spacing:0.5px;background:transparent;color:var(--text-muted);transition:all 0.2s">
+                🏗 DYNASTY
+              </button>
+              <button id="modeBtn1" onclick="setWinNowMode(true)"
+                style="padding:4px 12px;border-radius:16px;border:none;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:600;letter-spacing:0.5px;background:var(--gold);color:#000;transition:all 0.2s">
+                🏆 WIN-NOW
+              </button>
+            </div>
+            <span id="modeDesc" style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--text-muted);letter-spacing:0.5px">
+              Balancing year-1 contribution + long-term upside
+            </span>
+          </div>
+          <div id="adviceBar" style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap"></div>
+
+          <div class="filter-row" id="filterBtns">
+            <button class="filter-btn active" onclick="setFilter('ALL',this)">All</button>
+            <button class="filter-btn" onclick="setFilter('H',this)">Hitters</button>
+            <button class="filter-btn" onclick="setFilter('SP',this)">SP</button>
+            <button class="filter-btn" onclick="setFilter('RP',this)">RP / Closers</button>
+            <button class="filter-btn" onclick="setFilter('C',this)">C</button>
+            <button class="filter-btn" onclick="setFilter('1B',this)">1B</button>
+            <button class="filter-btn" onclick="setFilter('2B',this)">2B</button>
+            <button class="filter-btn" onclick="setFilter('3B',this)">3B</button>
+            <button class="filter-btn" onclick="setFilter('SS',this)">SS</button>
+            <button class="filter-btn" onclick="setFilter('OF',this)">OF</button>
+            <button class="filter-btn" onclick="setFilter('PROSP',this)">★ Prospects</button>
+            <button class="filter-btn warn" onclick="toggleHideDrafted(this)">Hide Drafted</button>
+            <button class="filter-btn" style="margin-left:auto" onclick="advancePick()">Skip Pick ›</button>
+          </div>
+          <div class="search-wrap">
+            <input class="search-input" id="searchInput" type="text" placeholder="Search player name, team, position..." oninput="setSearch(this.value)" autocomplete="off">
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th onclick="setSort('ovrRk')" data-col="ovrRk" title="Overall Dynasty Rank">RK</th>
+                  <th onclick="setSort('name')" data-col="name" style="min-width:160px">NAME</th>
+                  <th onclick="setSort('age')" data-col="age" title="Age">AGE</th>
+                  <th>TEAM</th>
+                  <th title="Type: H=Hitter, SP=Starter, RP=Reliever">TYPE</th>
+                  <th title="Key projected stats">STAT LINE</th>
+                  <th onclick="setSort('pitchPlus')" data-col="pitchPlus" title="Eno Sarris Pitching+ (SPs only). 100=avg, 115+=elite. NOW ADJUSTS DYN Z: ≥118 +12%, ≥110 +5%, ≥103 ±0%, ≥97 -8%, below -15%. ▲/▼ in DYN Z column shows adjustment.">PITCH+</th>
+                  <th title="Stuff+ / Location+ / Health — Eno Sarris pitch report. Hover player name for full scouting note." style="min-width:110px">S+ · L+ · HLTH</th>
+                  <th onclick="setSort('dynZ')" data-col="dynZ" title="Our model: z-score × age multiplier (your league's categories)">DYN Z</th>
+                  <th onclick="setSort('hkb')" data-col="hkb" title="HarryKnowsBall crowdsourced dynasty market value">HKB</th>
+                  <th onclick="setSort('delta')" data-col="delta" title="Delta: positive = market undervaluing vs our model = BUY. Negative = market overvaluing = SELL.">DELTA</th>
+                  <th>NOTES</th>
+                  <th style="min-width:62px"></th>
+                </tr>
+              </thead>
+              <tbody id="playerTbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: Pick Panel + Mini Roster -->
+      <div class="pick-panel">
+        <div class="stat-grid-2">
+          <div class="stat-card">
+            <div class="stat-val" id="sc-drafted" style="color:var(--accent)">0</div>
+            <div class="stat-lbl">Drafted</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-val" id="sc-mypicks" style="color:var(--purple)">0/23</div>
+            <div class="stat-lbl">My Picks</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-val" id="sc-avail" style="color:var(--green)">—</div>
+            <div class="stat-lbl">Available</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-val" id="sc-round" style="color:var(--gold)">1</div>
+            <div class="stat-lbl">Round</div>
+          </div>
+        </div>
+
+        <!-- TAKE CARD — shown only on your pick -->
+        <div class="take-card" id="takeCard">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--accent);text-transform:uppercase">⚡ War Room Recommends</div>
+          <div class="take-meta" id="takeMeta"></div>
+          <div class="take-player-name" id="takePlayerName">—</div>
+          <div class="take-reason" id="takeReason"></div>
+          <button class="take-btn" id="takeBtn" onclick="executeTake()">TAKE</button>
+        </div>
+          <div id="countdownNum" style="font-family:'Bebas Neue',cursive;font-size:42px;letter-spacing:3px;line-height:1;color:var(--accent)">—</div>
+          <div id="countdownLbl" style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--text-muted);text-transform:uppercase;margin-top:3px">Picks Until Your Turn</div>
+        </div>
+
+        <div class="panel" style="padding:12px;margin-bottom:0">
+          <div class="panel-title" style="font-size:14px;margin-bottom:10px">🎯 SNAKE PICKS</div>
+          <div id="pickListEl"></div>
+        </div>
+
+        <div class="panel" style="padding:12px;margin-bottom:0">
+          <div class="panel-title" style="font-size:14px;margin-bottom:10px">📋 MY ROSTER</div>
+          <div id="miniRosterEl"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ MY ROSTER ═══════════════ -->
+  <div class="tab-content" id="tab-my-roster">
+    <div class="stat-grid-4" id="rosterStatCards">
+      <div class="stat-card"><div class="stat-val" id="rs-count" style="color:var(--accent)">0</div><div class="stat-lbl">Players Drafted</div></div>
+      <div class="stat-card"><div class="stat-val" id="rs-avgdynz" style="color:var(--green)">—</div><div class="stat-lbl">Avg DYN Z</div></div>
+      <div class="stat-card"><div class="stat-val" id="rs-avghkb" style="color:var(--purple)">—</div><div class="stat-lbl">Avg HKB</div></div>
+      <div class="stat-card"><div class="stat-val" id="rs-avgage" style="color:var(--gold)">—</div><div class="stat-lbl">Avg Age</div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div class="panel">
+        <div class="panel-title">🗂️ ROSTER SLOTS</div>
+        <div class="roster-grid-2" id="rosterSlotsEl"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">📊 DRAFTED PLAYERS</div>
+        <div style="overflow-y:auto;max-height:520px">
+          <table class="data-table">
+            <thead><tr>
+              <th onclick="setSort('ovrRk')" data-col="ovrRk">RK</th>
+              <th>NAME</th><th>POS</th><th>AGE</th><th>TEAM</th>
+              <th>DYN Z</th><th>HKB</th><th>DELTA</th><th></th>
+            </tr></thead>
+            <tbody id="myRosterTbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ POWER RANKINGS ═══════════════ -->
+  <div class="tab-content" id="tab-power-rankings">
+    <div class="panel">
+      <div class="placeholder">
+        <div class="ph-icon">🏆</div>
+        <div class="ph-title">Power Rankings</div>
+        <div class="ph-text">
+          Live power rankings compare all 12 teams by total roster DYN Z + HKB value.
+          Requires connecting your Yahoo Fantasy Baseball league via OAuth.
+          Setup takes about 20 minutes — guide coming soon after draft day.
+        </div>
+        <button class="connect-btn" onclick="alert('Yahoo OAuth setup guide coming soon. Complete your draft first, then we\'ll set this up together.')">Connect Yahoo League</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ TRADE ANALYZER ═══════════════ -->
+  <div class="tab-content" id="tab-trade-analyzer">
+    <div class="panel">
+      <div class="panel-title">⚖️ TRADE ANALYZER</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;padding:14px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)">
+        <div style="text-align:center">
+          <div style="font-family:'Bebas Neue',cursive;font-size:18px;color:var(--green);letter-spacing:2px">DYN Z</div>
+          <div style="font-size:11px;color:var(--text-dim);margin-top:4px;line-height:1.5">Our model score.<br>Your league's exact categories<br>+ age multiplier.</div>
+        </div>
+        <div style="text-align:center;border-left:1px solid var(--border);border-right:1px solid var(--border)">
+          <div style="font-family:'Bebas Neue',cursive;font-size:18px;color:var(--purple);letter-spacing:2px">HKB</div>
+          <div style="font-size:11px;color:var(--text-dim);margin-top:4px;line-height:1.5">Market price.<br>50,000+ dynasty managers<br>voting in real time.</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-family:'Bebas Neue',cursive;font-size:18px;color:var(--accent);letter-spacing:2px">DELTA</div>
+          <div style="font-size:11px;color:var(--text-dim);margin-top:4px;line-height:1.5">Where they diverge.<br><span style="color:var(--green)">▲ GREEN = market sleeping on them.</span><br><span style="color:var(--red)">▼ RED = market overpaying.</span></div>
+        </div>
+      </div>
+      <div class="trade-grid">
+        <div class="trade-side">
+          <div class="trade-header">
+            <span style="color:var(--red)">YOU GIVE</span>
+            <div style="text-align:right">
+              <div class="mono" style="font-size:9px;color:var(--text-muted)">DYN Z</div>
+              <div class="trade-score" id="giveScoreDynZ">0.00</div>
+              <div class="mono" style="font-size:9px;color:var(--purple)">HKB: <span id="giveScoreHKB">0</span></div>
+            </div>
+          </div>
+          <div class="trade-input-wrap">
+            <input class="trade-search" id="tradeGiveSearch" placeholder="Search player to add..." oninput="tradeAC('give',this.value)" autocomplete="off">
+            <div class="autocomplete-drop" id="tradeGiveAC"></div>
+          </div>
+          <div id="tradeGiveList"></div>
+        </div>
+        <div class="trade-side">
+          <div class="trade-header">
+            <span style="color:var(--green)">YOU GET</span>
+            <div style="text-align:right">
+              <div class="mono" style="font-size:9px;color:var(--text-muted)">DYN Z</div>
+              <div class="trade-score" id="getScoreDynZ">0.00</div>
+              <div class="mono" style="font-size:9px;color:var(--purple)">HKB: <span id="getScoreHKB">0</span></div>
+            </div>
+          </div>
+          <div class="trade-input-wrap">
+            <input class="trade-search" id="tradeGetSearch" placeholder="Search player to add..." oninput="tradeAC('get',this.value)" autocomplete="off">
+            <div class="autocomplete-drop" id="tradeGetAC"></div>
+          </div>
+          <div id="tradeGetList"></div>
+        </div>
+      </div>
+      <div class="trade-verdict" id="tradeVerdictEl">
+        <div class="mono muted" style="font-size:12px">Add players to both sides to analyze</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ WAIVERS ═══════════════ -->
+  <div class="tab-content" id="tab-waivers">
+    <div class="panel">
+      <div class="placeholder" id="waiverPlaceholder">
+        <div class="ph-icon">📋</div>
+        <div class="ph-title">Waiver Wire</div>
+        <div class="ph-text">Shows all undrafted players ranked by DYN Z and HKB value. Populates automatically once draft picks are recorded.</div>
+        <button class="connect-btn" onclick="renderWaivers()">View Available Players</button>
+      </div>
+      <div id="waiverContent" style="display:none">
+        <div class="panel-title">📋 AVAILABLE PLAYERS</div>
+        <div class="filter-row" style="margin-bottom:10px">
+          <button class="filter-btn active" onclick="setWaiverFilter('ALL',this)">All</button>
+          <button class="filter-btn" onclick="setWaiverFilter('H',this)">Hitters</button>
+          <button class="filter-btn" onclick="setWaiverFilter('SP',this)">SP</button>
+          <button class="filter-btn" onclick="setWaiverFilter('RP',this)">RP</button>
+        </div>
+        <div class="table-wrap" style="max-height:calc(100vh - 280px)">
+          <table class="data-table">
+            <thead><tr>
+              <th>RK</th><th style="min-width:140px">NAME</th><th>POS</th>
+              <th>AGE</th><th>TEAM</th><th>STAT LINE</th>
+              <th>DYN Z</th><th>HKB</th><th>DELTA</th><th>NOTES</th>
+            </tr></thead>
+            <tbody id="waiverTbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ TRADE FINDER ═══════════════ -->
+  <div class="tab-content" id="tab-trade-finder">
+    <div class="panel">
+      <div class="placeholder">
+        <div class="ph-icon">🔍</div>
+        <div class="ph-title">Trade Finder</div>
+        <div class="ph-text">
+          Scans your roster vs. all 12 league rosters and surfaces buy-low / sell-high targets based on DYN Z vs. HKB divergence.
+          Requires Yahoo league connection to read other teams' rosters.
+        </div>
+        <button class="connect-btn" onclick="alert('Yahoo OAuth setup guide coming soon.')">Connect Yahoo League</button>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+// ════════════════════════════════════════════════════════════════════
+// CONFIG
+// ════════════════════════════════════════════════════════════════════
+const CONFIG = {
+  SHEET_URL: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRYbqsjdrqNLJmc5jOXOg9aggvu-tnM_iQpwHGUghNGSPCD7K_owrZrSJxE-ycayg/pub?gid=528869536&single=true&output=csv',
+  MY_TEAM: 'Chief Noc-A-Homa',
+  DRAFT_POS: 8,
+  N_TEAMS: 12,
+  N_ROUNDS: 23,
+  TOTAL_PICKS: 276,
+};
+
+// ════════════════════════════════════════════════════════════════════
+// SNAKE PICKS — Pick 8, 12 teams, 23 rounds
+// ════════════════════════════════════════════════════════════════════
+const SNAKE_PICKS = (function() {
+  const picks = [];
+  for (let r = 1; r <= 23; r++) {
+    const overall = r % 2 === 1
+      ? (r - 1) * 12 + 8
+      : r * 12 - 7;
+    picks.push({ round: r, overall });
+  }
+  return picks;
+})();
+const MY_OVERALL_PICKS = new Set(SNAKE_PICKS.map(p => p.overall));
+
+// ════════════════════════════════════════════════════════════════════
+// HKB VALUES — HarryKnowsBall crowdsourced dynasty market values
+// ════════════════════════════════════════════════════════════════════
+const HKB_RAW = {
+  'bobby witt jr':10000,'shohei ohtani':9875,'juan soto':8756,'paul skenes':8607,
+  'corbin carroll':6963,'nick kurtz':6799,'junior caminero':6795,'tarik skubal':6780,
+  'elly de la cruz':6518,'julio rodriguez':6389,'roman anthony':6305,'gunnar henderson':6252,
+  'ronald acuna jr':6008,'vladimir guerrero jr':5974,'aaron judge':5963,'garrett crochet':5888,
+  'jackson chourio':5638,'fernando tatis jr':5515,'konnor griffin':5495,'james wood':5011,
+  'yoshinobu yamamoto':4867,'jose ramirez':4846,'bryan woo':4617,'kyle tucker':4616,
+  'wyatt langford':4523,'cal raleigh':4474,'zach neto':4375,'yordan alvarez':4304,
+  'pete crow armstrong':4174,'jackson merrill':4123,'hunter brown':4083,'eury perez':3923,
+  'kevin mcgonigle':3838,'cristopher sanchez':3829,'hunter greene':3809,'chase burns':3643,
+  'logan gilbert':3634,'jazz chisholm jr':3568,'jj wetherholt':3538,'riley greene':3518,
+  'rafael devers':3392,'logan webb':3356,'ketel marte':3337,'jacob misiorowski':3321,
+  'francisco lindor':3262,'george kirby':3252,'nolan mclean':3227,'jesus made':3202,
+  'cole ragans':3102,'leo de vries':3090,'spencer schwellenbach':3050,'bryce harper':2980,
+  'adley rutschman':2950,'grayson rodriguez':2920,'jackson holliday':2890,'drake baldwin':2860,
+  'michael harris ii':2830,'tanner bibee':2800,'max clark':2780,'freddy peralta':2760,
+  'colt emerson':2740,'cam mclean':2720,'coby mayo':2700,'dylan crews':2680,
+  'samuel basallo':2660,'colson montgomery':2640,'orelvis martinez':2620,'andrew painter':2600,
+  'druw jones':2580,'evan carter':2560,'cj abrams':2540,'zac veen':2520,
+  'bryce miller':2500,'mitch keller':2480,'jordy barley':2460,'william contreras':2420,
+  'trea turner':2400,'corey seager':2380,'alex bregman':2360,'pete alonso':2340,
+  'emmanuel clase':2300,'mason miller':2280,'andres munoz':2260,'ryan helsley':2240,
+  'jhoan duran':2220,'michael king':2200,'taj bradley':2180,'felix bautista':2160,
+  'matt olson':2120,'brent rooker':2100,'enrique bradfield jr':2080,'colton cowser':2060,
+  'austin riley':2020,'tommy edman':2000,'nico hoerner':1980,'steven kwan':1960,
+  'spencer steer':1940,'reid detmers':1920,'devin williams':1860,'alexis diaz':1840,
+  'pete fairbanks':1820,'josh hader':1800,'edwin diaz':1780,'jake burger':1740,
+  'nolan arenado':1720,'adbert alzolay':1700,'clay holmes':1680,'hunter harvey':1660,
+  'lucas erceg':1640,'robert suarez':1620,'camilo doval':1600,'david bednar':1580,
+  'sandy alcantara':1560,'pablo lopez':1540,'joe ryan':1520,'zac gallen':1500,
+  'aaron nola':1480,'nestor cortes':1460,'braxton garrett':1440,'framber valdez':1420,
+  'luis castillo':1400,'brady singer':1380,'riley greene':1360,'thomas white':1340,
+  'jackson jobe':1320,'trey yesavage':1300,'noble meyer':1280,'dylan lesko':1260,
+  'gavin williams':1240,'jarren duran':1220,'ian happ':1200,'bryan reynolds':1180,
+  'anthony santander':1160,'ryan mountcastle':1140,'mark vientos':1120,'bo naylor':1100,
+  'daulton varsho':1080,'mj melendez':1060,'shea langeliers':1040,'francisco alvarez':1020,
+  'cal raleigh':1000,'austin wells':980,'bo bichette':960,'masyn winn':940,
+  'sal frelick':920,'walker jenkins':900,'aidan miller':880,'chase davis':860,
+  'cam collier':840,'max anderson':820,'jacob wilson':800,'jordan lawlar':780,
+  'brooks lee':760,'tanner schobel':740,'gavin cross':720,'ronny mauricio':700,
+  'christian encarnacion strand':680,'triston casas':660,'esteury ruiz':640,
+  'orion kerkering':620,'ben joyce':600,'luis de leon':580,'kirby yates':560,
+  'kyle finnegan':540,'robert suarez':520,'lucas erceg':500,
+  'roki sasaki':2460,'chase dollander':1380,'bubba chandler':2180,
+'aaron ashby':300,
+  'aaron civale':300,
+  'adam cimber':100,
+  'adam duvall':300,
+  'adam mazur':300,
+  'adam oller':300,
+  'adrian houser':100,
+  'aj blubaugh':100,
+  'albert su rez':300,
+  'alec marsh':300,
+  'alejandro kirk':600,
+  'alek manoah':100,
+  'alex cobb':300,
+  'alex lange':400,
+  'alex verdugo':600,
+  'alex wood':300,
+  'andre pallante':180,
+  'andrew abbott':400,
+  'andrew benintendi':500,
+  'anthony kay':180,
+  'antonio senzatela':300,
+  'austin gomber':300,
+  'austin hays':500,
+  'bailey falter':300,
+  'bailey ober':180,
+  'ben brown':100,
+  'ben casparius':300,
+  'ben lively':300,
+  'blade tidwell':100,
+  'blake snell':1400,
+  'bobby miller':300,
+  'brad lord':300,
+  'brandon nimmo':800,
+  'brandon pfaadt':180,
+  'brandon sproat':180,
+  'brandon woodruff':700,
+  'brandon young':300,
+  'braxton ashcraft':700,
+  'brayan bello':280,
+  'brendan donovan':700,
+  'brusdar graterol':400,
+  'bryce elder':100,
+  'bryse wilson':300,
+  'cade cavalli':400,
+  'cade horton':900,
+  'cade povich':100,
+  'caden dana':100,
+  'cal quantrill':300,
+  'caleb ferguson':200,
+  'cam schlittler':1600,
+  'carlos carrasco':300,
+  'carlos rod n':700,
+  'carmen mlodzinski':100,
+  'carson fulmer':300,
+  'carson spiers':300,
+  'carson whisenhunt':300,
+  'casey kelly':300,
+  'casey mize':400,
+  'chad green':200,
+  'chad patrick':400,
+  'charlie morton':100,
+  'chayce mcdermott':300,
+  'chris bassitt':280,
+  'chris flexen':300,
+  'chris paddack':300,
+  'chris sale':3200,
+  'christian arroyo':200,
+  'christian scott':300,
+  'christian walker':900,
+  'cody bellinger':1400,
+  'cody bradford':100,
+  'cody ponce':550,
+  'cole irvin':300,
+  'colin rea':300,
+  'colton gordon':300,
+  'connelly early':180,
+  'connor gillispie':300,
+  'cooper criswell':300,
+  'corbin burnes':300,
+  'cristian javier':280,
+  'cristopher s nchez':4200,
+  'dakota hudson':300,
+  'dane dunning':300,
+  'daniel hudson':150,
+  'danny jansen':500,
+  'darren mccaughan':300,
+  'david festa':100,
+  'david peterson':400,
+  'davis martin':100,
+  'dean kremer':100,
+  'didier fuentes':300,
+  'dj herz':300,
+  'dj lemahieu':500,
+  'dl hall':300,
+  'dominic canzone':400,
+  'drew anderson':180,
+  'drew rasmussen':1600,
+  'drew thorpe':300,
+  'dustin may':400,
+  'dylan cease':1600,
+  'easton lucas':300,
+  'eduardo rodriguez':100,
+  'edward cabrera':1200,
+  'elias diaz':300,
+  'elvin rodriguez':300,
+  'emerson hancock':100,
+  'emmet sheehan':1600,
+  'enrique hernandez':300,
+  'eric lauer':300,
+  'erick fedde':300,
+  'eury p rez':2500,
+  'evan phillips':700,
+  'ezequiel tovar':1200,
+  'foster griffin':100,
+  'freddie freeman':2200,
+  'gage jump':300,
+  'german marquez':300,
+  'gerrit cole':700,
+  'gleyber torres':800,
+  'grant holmes':280,
+  'gregory soto':400,
+  'griffin canning':300,
+  'gunnar hoglund':300,
+  'ha seong kim':800,
+  'harrison bader':300,
+  'hayden birdsong':100,
+  'hogan harris':300,
+  'hunter barco':400,
+  'hunter dobbins':100,
+  'hurston waldrep':180,
+  'ian seymour':180,
+  'jack flaherty':550,
+  'jack kochanowicz':300,
+  'jack leiter':550,
+  'jack perkins':100,
+  'jacob degrom':2000,
+  'jacob latz':400,
+  'jacob lopez':180,
+  'jake diekman':100,
+  'jake irvin':300,
+  'jakob junis':300,
+  'jakson reetz':100,
+  'jameson taillon':180,
+  'janson junk':180,
+  'jared jones':550,
+  'jason adam':400,
+  'jason alexander':100,
+  'javier assad':300,
+  'jeff hoffman':600,
+  'jeffrey springs':180,
+  'jes s luzardo':1600,
+  'joc pederson':500,
+  'joe boyle':280,
+  'joe musgrove':280,
+  'joe ross':300,
+  'joey cantillo':700,
+  'joey estes':300,
+  'joey wentz':300,
+  'johan oviedo':400,
+  'jon gray':300,
+  'jonah tong':180,
+  'jonathan cannon':300,
+  'jonathan india':800,
+  'jonathan loaisiga':400,
+  'jordan montgomery':100,
+  'jordan romano':800,
+  'jordan wicks':300,
+  'jorge soler':700,
+  'jos berr os':180,
+  'jos soriano':550,
+  'jos ure a':300,
+  'jose altuve':1800,
+  'jose alvarado':500,
+  'jose leclerc':500,
+  'jose quintana':300,
+  'jose urquidy':300,
+  'josh jung':900,
+  'josh lowe':800,
+  'josh naylor':800,
+  'josh rojas':300,
+  'josh staumont':150,
+  'josiah gray':300,
+  'jp sears':100,
+  'jt ginn':180,
+  'justin steele':180,
+  'justin verlander':280,
+  'justin wrobleski':280,
+  'kai wei teng':100,
+  'keaton winn':300,
+  'keider montero':300,
+  'kendall graveman':300,
+  'kenta maeda':300,
+  'kevin gausman':900,
+  'kodai senga':550,
+  'kris bubic':700,
+  'kumar rocker':180,
+  'kutter crawford':100,
+  'kyle bradish':2500,
+  'kyle freeland':300,
+  'kyle harrison':400,
+  'kyle hart':300,
+  'kyle hendricks':300,
+  'lance lynn':300,
+  'lance mccullers jr':100,
+  'landen roupp':400,
+  'landon knack':300,
+  'logan allen':100,
+  'logan henderson':280,
+  'lourdes gurriel jr':600,
+  'lucas giolito':300,
+  'luis arraez':900,
+  'luis f castillo':300,
+  'luis gil':400,
+  'luis medina':300,
+  'luis morales':180,
+  'luis severino':280,
+  'mackenzie gore':1200,
+  'manny machado':2000,
+  'marcus stroman':300,
+  'mark canha':300,
+  'mark leiter jr':400,
+  'mart n p rez':300,
+  'mason black':300,
+  'matt waldron':300,
+  'matthew boyd':550,
+  'matthew liberatore':400,
+  'max fried':3200,
+  'max meyer':400,
+  'max scherzer':280,
+  'max stassi':150,
+  'merrill kelly':280,
+  'michael conforto':400,
+  'michael fulmer':200,
+  'michael lorenzen':300,
+  'michael massey':400,
+  'michael mcgreevy':180,
+  'michael soroka':180,
+  'michael wacha':180,
+  'mick abel':280,
+  'miguel rojas':150,
+  'mike burrows':400,
+  'mike zunino':100,
+  'miles mikolas':300,
+  'mitch spence':300,
+  'mitchell parker':300,
+  'nathan eovaldi':1200,
+  'nathaniel lowe':1200,
+  'nick castellanos':700,
+  'nick lodolo':1200,
+  'nick martinez':100,
+  'nick nastrini':300,
+  'nick pivetta':1200,
+  'noah cameron':280,
+  'noah schultz':300,
+  'osvaldo bido':300,
+  'parker messick':400,
+  'patrick bailey':1800,
+  'patrick corbin':300,
+  'patrick sandoval':180,
+  'paul blackburn':300,
+  'paul dejong':200,
+  'paul sewald':500,
+  'paxton schultz':300,
+  'payton tolle':100,
+  'pierce johnson':300,
+  'quinn mathews':100,
+  'quinn priester':280,
+  'rafael montero':400,
+  'raisel iglesias':700,
+  'ramon laureano':300,
+  'randy v squez':100,
+  'ranger su rez':700,
+  'reynaldo l pez':280,
+  'rhett lowder':100,
+  'richard fitts':280,
+  'ricky tiedemann':300,
+  'river ryan':280,
+  'robbie ray':900,
+  'robby snelling':280,
+  'robert gasser':180,
+  'robinson chirinos':100,
+  'roddery mu oz':300,
+  'ross stripling':300,
+  'rowdy tellez':400,
+  'ryan bergert':100,
+  'ryan feltner':300,
+  'ryan fitzgerald':400,
+  'ryan gusto':300,
+  'ryan mcmahon':700,
+  'ryan pepiot':1600,
+  'ryan weathers':550,
+  'ryan weiss':180,
+  'ryan yarbrough':300,
+  'ryne nelson':400,
+  'sawyer gipson long':300,
+  'scott barlow':300,
+  'sean burke':100,
+  'sean manaea':400,
+  'sean murphy':1400,
+  'sean newcomb':100,
+  'seiya suzuki':1200,
+  'seranthony dominguez':300,
+  'seth lugo':280,
+  'shane baz':550,
+  'shane bieber':700,
+  'shane mcclanahan':550,
+  'shane smith':280,
+  'shinnosuke ogasawara':300,
+  'shota imanaga':700,
+  'simeon woods richardson':180,
+  'sixto s nchez':300,
+  'slade cecconi':280,
+  'sonny gray':900,
+  'spencer arrighetti':280,
+  'spencer strider':1200,
+  'spencer torkelson':600,
+  'spencer turnbull':300,
+  'stephen kolek':100,
+  'steven matz':400,
+  'taijuan walker':300,
+  'tanner scott':700,
+  'tatsuya imai':1200,
+  'tayler saucedo':200,
+  'taylor rogers':500,
+  'teoscar hernandez':900,
+  'thomas harrington':300,
+  'tim anderson':300,
+  'tobias myers':300,
+  'tommy henry':300,
+  'tomoyuki sugano':300,
+  'travis d arnaud':400,
+  'trevor mcdonald':100,
+  'trevor rogers':550,
+  'trevor williams':300,
+  'triston mckenzie':300,
+  'troy melton':180,
+  'ty blach':300,
+  'ty france':300,
+  'tyler alexander':300,
+  'tyler anderson':300,
+  'tyler glasnow':1600,
+  'tyler mahle':280,
+  'tyler o neill':900,
+  'tyler oneill':900,
+  'tyler phillips':300,
+  'tyler stephenson':700,
+  'tyler wells':100,
+  'valente bellozo':300,
+  'vinnie pasquantino':1100,
+  'walker buehler':180,
+  'will vest':200,
+  'will warren':550,
+  'willy adames':1600,
+  'xander bogaerts':700,
+  'xzavion curry':300,
+  'yandy diaz':500,
+  'yariel rodr guez':300,
+  'yerry de los santos':300,
+  'yoan moncada':500,
+  'yoendrys gomez':300,
+  'yusei kikuchi':280,
+  'zach eflin':280,
+  'zack littell':300,
+  'zack wheeler':1200,
+  'zebby matthews':280,
+};
+
+// ════════════════════════════════════════════════════════════════════
+// ENO SARRIS PITCH REPORT 2026
+// Stuff+ / Location+ / Pitching+ / Health / ppERA / Blurb
+// Source: The Athletic / Eno Sarris, March 2026
+// ════════════════════════════════════════════════════════════════════
+const ENO_DATA = {
+  "tarik skubal":{r:1,s:123,l:101,p:123,h:"87%",ip:"180",era:"2.55",b:"What is there to say about this power lefty coming off two straight Cy Young seasons that everyone doesn't know by now? How about a quick discussion of his health risk, that wet blanket that hangs over all pitchers in the game today. It's true that Tarik Skubal has had some injuries in the past"},
+  "paul skenes":{r:2,s:110,l:111,p:120,h:"91%",ip:"183",era:"2.74",b:"When it comes to injury risk, Paul Skenes provides a fascinating foil to Tarik Skubal. His health bill has largely been clean so far, but he sits only 2 mph off his maximum fastball velocity. He still gets an A in the health department. Power, command and a wide arsenal: he's got everything."},
+  "garrett crochet":{r:3,s:117,l:100,p:114,h:"85%",ip:"181",era:"2.90",b:"With a top-10 fastball in the league and the best cutter thrown by a starter (both by Stuff+), Garrett Crochet has an excellent foundation. He diversified in 2025 — more sinkers and sliders made him a four-pitch power dude with command."},
+  "cristopher sanchez":{r:4,s:117,l:99,p:116,h:"94%",ip:"186",era:"3.09",b:"After throwing harder (95+ on the fastball, 85+ on the slider), his stuff and strikeout numbers surged and he looks like an ace. High-end No. 2 starter floor at minimum. Best health grade of any ace-tier arm."},
+  "yoshinobu yamamoto":{r:5,s:100,l:107,p:110,h:"85%",ip:"169",era:"3.22",b:"Stuff+ is merely above-average for a starter of his caliber, but he excels at Location+. A statistic like Stuff+ matters most in the first five starts — after that, results fold in too. He has been elite."},
+  "hunter brown":{r:6,s:105,l:97,p:103,h:"93%",ip:"187",era:"3.36",b:"Ever since he added a sinker, Hunter Brown has been an ace. Top 15 in innings and strikeouts over two seasons with a 2.94 ERA. Best health grade of any high-end starter. Small orange flag from strikeout rate dip in second half."},
+  "max fried":{r:7,s:109,l:103,p:113,h:"87%",ip:"170",era:"3.32",b:"A completely new sinker, his slider and sweeper separated further into two better pitches, career-best numbers. He looks like a legitimate top-10 starter, and the Yankees give him wins support."},
+  "logan gilbert":{r:8,s:104,l:102,p:108,h:"88%",ip:"153",era:"3.05",b:"Forearm tightness cost him time. Around that injury, Gilbert looked as good as ever — best strikeout rate of his career. Now a splitter guy, his awesome extension makes it hard on hitters. Health is the only concern."},
+  "bryan woo":{r:9,s:109,l:105,p:112,h:"87%",ip:"162",era:"3.14",b:"This health grade seems a little rosy — doesn't include his college Tommy John surgery. He ran out of gas late last season and had a right forearm issue. The stuff is elite when healthy."},
+  "chris sale":{r:10,s:116,l:102,p:113,h:"63%",ip:"144",era:"3.02",b:"Still an ace, but also 37. A fractured ribcage on an acrobatic play derailed 2025. When he pitches he's elite — the health grade is the entire story here."},
+  "george kirby":{r:11,s:99,l:111,p:109,h:"86%",ip:"162",era:"3.21",b:"Shoulder inflammation was a comparative blip. Among pitchers with Cy-worth upside and health risk, Kirby's soreness has been manageable. His elite Location+ is rare for a high-K pitcher."},
+  "logan webb":{r:12,s:106,l:105,p:110,h:"97%",ip:"191",era:"3.25",b:"A wider arsenal pushed the Giants ace to the best season of his career. Best health grade (97%) of any top-15 pitcher. He's the safest high-floor arm in the draft. Durability is a fantasy superpower."},
+  "framber valdez":{r:13,s:106,l:100,p:110,h:"90%",ip:"181",era:"3.52",b:"Statistically speaking, Framber Valdez has been a rock. Even his worst season was top 40 in fantasy because of ground balls and an above-average strikeout rate. Durable workhorse with elite health grade."},
+  "eury perez":{r:14,s:115,l:97,p:108,h:"65%",ip:"153",era:"3.59",b:"The promise is tantalizing — 98 mph fastball, 86 mph power slider. He had top-10 Stuff+ but the health grade is a major concern at 65%. If he stays healthy, he could make a Sanchez-type leap."},
+  "cole ragans":{r:16,s:112,l:101,p:111,h:"78%",ip:"132",era:"3.37",b:"After a couple elbow surgeries in the Rangers org, he broke free and became a stud. Finished 4th in AL Cy Young voting in 2024. Health flag is the main concern — only 78% and limited projected IP."},
+  "jacob degrom":{r:17,s:108,l:107,p:117,h:"53%",ip:"130",era:"3.41",b:"Coming off a season where he threw 170+ innings for first time since 2019, sitting in the high 90s again. Almost vintage. But 53% health grade is the worst of any top-20 ranked arm. Pure boom/bust."},
+  "freddy peralta":{r:18,s:99,l:108,p:106,h:"86%",ip:"170",era:"3.74",b:"Seventh-best fantasy SP last year. The year before he was 41st. He can be super valuable. The Location+ is where he excels — elite command of average stuff. Health grade solid at 86%."},
+  "shohei ohtani":{r:19,s:114,l:101,p:116,h:"66%",ip:"133",era:"3.08",b:"In certain fantasy leagues he is draftable separately as a pitcher. Career 3.00 ERA built on impeccable stuff. His elbow health is the key question. Eno projects 133 IP if he pitches — elite when he does."},
+  "joe ryan":{r:20,s:108,l:103,p:108,h:"88%",ip:"156",era:"3.62",b:"Unique arm slot and fastball shape, plus willingness to pitch up in the zone, makes him a high-strikeout No. 2 starter. Good health grade. Only 148 qualified starters have higher K rates since 2022."},
+  "tyler glasnow":{r:21,s:101,l:89,p:97,h:"61%",ip:"123",era:"3.39",b:"He lost velocity last season — nearly two full ticks on the curve. Location+ at 89 is the worst of any top-25 arm. Health grade of 61% makes him a boom/bust pick. Elite when healthy, rarely healthy."},
+  "dylan cease":{r:23,s:108,l:100,p:107,h:"90%",ip:"172",era:"3.55",b:"Sometimes underperforms his peripherals as a two-pitch pitcher, but the peripherals are often top of the league. Excellent health grade at 90%. The ride can be bumpy but the ceiling is real."},
+  "jacob misiorowski":{r:24,s:116,l:103,p:119,h:"74%",ip:"142",era:"3.41",b:"Sits 99 on the fastball with a mid-90s slider and high-80s curveball. High Stuff+ and high Pitching+. Two risks: fastball command and durability (74%). If he finds command he's a top-10 arm."},
+  "nolan mclean":{r:25,s:108,l:98,p:109,h:"79%",ip:"157",era:"3.69",b:"48-inning debut — struck out nearly a third of batters, great model numbers. More tentative against lefties. Still a prospect with 79% health. If he develops a third pitch, top-15 ceiling."},
+  "chase burns":{r:27,s:116,l:103,p:119,h:"72%",ip:"131",era:"2.96",b:"Pure rocket fuel — sat 99 mph with a 91 mph slider and 36% strikeout rate. Bad BABIP luck inflated his ERA. Among the highest ceilings in the draft. Health risk at 72% is the only real concern."},
+  "zack wheeler":{r:34,s:110,l:108,p:120,h:"67%",ip:"128",era:"3.19",b:"Thoracic Outlet Surgery — hopefully the good kind. When healthy he's an elite arm with 120 Pitching+. Health grade of 67% and limited projected IP make him a late-round gamble on elite upside."},
+  "hunter greene":{r:73,s:120,l:104,p:120,h:"73%",ip:"96",era:"3.24",b:"Sat 99.5 mph on the four-seam for over 100 innings — first time ever done. Dominant when healthy. TJ surgery means limited IP projection (96). Elite 120 Pitching+ when he returns mid-2026."},
+  "reid detmers":{r:78,s:115,l:110,p:122,h:"#N/A",ip:"134",era:"3.65",b:"Elite 122 Pitching+ — among the best in the entire dataset. Stuff+ of 115 plus Location+ of 110 is a rare combination. Health grade unavailable. Sleeper candidate with elite underlying metrics."},
+  "spencer schwellenbach":{r:135,s:107,l:109,p:116,h:"79%",ip:"77",era:"3.55",b:"Both Stuff+ and Location+ are above average — 107 and 109. Pitching+ of 116 suggests strong underlying talent. Limited projected IP (77) due to workload management as he builds arm strength."},
+  "blake snell":{r:54,s:104,l:109,p:114,h:"65%",ip:"105",era:"3.33",b:"Per-inning, few are better. Career ERA lower than almost any pitcher. But he only has about 20 more career innings than Paul Skenes. Boom/bust — elite upside, 65% health, limited IP projection."},
+  "sandy alcantara":{r:48,s:104,l:104,p:105,h:"70%",ip:"176",era:"4.05",b:"From late August on, he had a 3.21 ERA with ground balls and a low walk rate. Coming back from TJ surgery. Good underlying metrics, high IP projection, but 70% health grade reflects real concern."},
+  "grayson rodriguez":{r:999,s:null,l:null,p:null,h:null,ip:null,era:null,b:"Not yet ranked by Eno in this report — young arm with dynasty upside."},
+  "taj bradley":{r:94,s:101,l:92,p:94,h:"88%",ip:"133",era:"4.11",b:"Good health grade at 88%. Average Stuff+ and below-average Location+ (92). Pitching+ of 94 puts him as a fringe SP. Best dynasty value is in his youth and K-rate upside."},
+  "mitch keller":{r:98,s:94,l:100,p:93,h:"93%",ip:"172",era:"4.18",b:"Best health grade (93%) of any SP in the 90-100 range. Average Location+, below-average Stuff+. Pitching+ of 93 is below average. His value is durability and volume — safe if unspectacular."}
+};
+
+function cleanNameEno(n) {
+  // Normalize accents, strip punctuation, lowercase — for ENO_DATA matching
+  return (n||'').toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z0-9 ]/g,' ')
+    .replace(/\s+/g,' ').trim();
+}
+
+function lookupEno(name) {
+  const c = cleanNameEno(name);
+  if (ENO_DATA[c]) return ENO_DATA[c];
+  // Try without suffix Jr/Sr/II/III
+  const s = c.replace(/\b(jr|sr|ii|iii|iv)\b/g,'').replace(/\s+/g,' ').trim();
+  return ENO_DATA[s] || null;
+}
+
+function pitchPlusColor(val) {
+  if (!val) return 'var(--text-muted)';
+  if (val >= 118) return '#4cff91';
+  if (val >= 110) return '#9ee87a';
+  if (val >= 103) return '#ffd700';
+  if (val >= 97)  return '#ff8c42';
+  return '#ff4444';
+}
+
+function healthColor(h) {
+  if (!h || h === '#N/A') return 'var(--text-muted)';
+  const n = parseInt(h);
+  if (isNaN(n)) return 'var(--text-muted)';
+  if (n >= 88) return '#4cff91';
+  if (n >= 75) return '#ffd700';
+  if (n >= 60) return '#ff8c42';
+  return '#ff4444';
+}
+
+
+// prevents false positives from ⚠️ flag being truthy
+// ════════════════════════════════════════════════════════════════════
+const KNOWN_PROSPECTS = new Set([
+  'konnor griffin','roman anthony','kevin mcgonigle','samuel basallo',
+  'colt emerson','druw jones','dylan crews','colson montgomery',
+  'max clark','zac veen','enrique bradfield jr','jacob wilson',
+  'orelvis martinez','cam mclean','thomas white','andrew painter',
+  'jackson jobe','trey yesavage','noble meyer','luis de leon',
+  'ben joyce','orion kerkering','jesus made','leo de vries',
+  'jj wetherholt','jackson holliday','coby mayo','evan carter',
+  'cam collier','walker jenkins','aidan miller','chase davis',
+  'brooks lee','jordan lawlar','max anderson','gavin cross',
+  'tanner schobel','ronny mauricio','brainer bonaci','heston kjerstad',
+  'jose salas','brice matthews','gavin williams','dylan lesko',
+  'jacob misiorowski','chase dollander','jurrangelo cijntje',
+  'aj sloan','bryce rainer','colt emerson',
+]);
+// ════════════════════════════════════════════════════════════════════
+const ROSTER_SLOTS = [
+  // ── ACTIVE HITTERS (9) ──────────────────────────────────────────
+  {id:'C',    label:'C',            posTypes:['C'],           cls:'',       role:'Catcher'},
+  {id:'1B',   label:'1B',           posTypes:['1B'],          cls:'',       role:'First Base'},
+  {id:'2B',   label:'2B',           posTypes:['2B'],          cls:'',       role:'Second Base'},
+  {id:'3B',   label:'3B',           posTypes:['3B'],          cls:'',       role:'Third Base'},
+  {id:'SS',   label:'SS',           posTypes:['SS'],          cls:'',       role:'Shortstop'},
+  {id:'OF1',  label:'OF',           posTypes:['OF'],          cls:'',       role:'Outfield 1'},
+  {id:'OF2',  label:'OF',           posTypes:['OF'],          cls:'',       role:'Outfield 2'},
+  {id:'OF3',  label:'OF',           posTypes:['OF'],          cls:'',       role:'Outfield 3'},
+  {id:'UTIL', label:'UTIL',         posTypes:['H'],           cls:'',       role:'Utility Hitter'},
+  // ── ACTIVE PITCHERS (7) ─────────────────────────────────────────
+  {id:'SP1',  label:'SP',           posTypes:['SP'],          cls:'',       role:'Ace SP'},
+  {id:'SP2',  label:'SP',           posTypes:['SP'],          cls:'',       role:'Solid #2 SP'},
+  {id:'RP1',  label:'RP',           posTypes:['RP'],          cls:'',       role:'Elite Closer #1'},
+  {id:'RP2',  label:'RP',           posTypes:['RP'],          cls:'',       role:'Elite Closer #2'},
+  {id:'P1',   label:'P-FLEX · SP3', posTypes:['SP'],          cls:'pflex',  role:'SP3 — Young K-arm'},
+  {id:'P2',   label:'P-FLEX · CL',  posTypes:['RP'],          cls:'pflex',  role:'Closer #3 — SVH+ratios'},
+  {id:'P3',   label:'P-FLEX · CL',  posTypes:['RP'],          cls:'pflex',  role:'Closer #4 — handcuff'},
+  // ── BENCH (5) ───────────────────────────────────────────────────
+  {id:'BN1',  label:'BN · SP',      posTypes:['SP'],          cls:'',       role:'SP bench — injury buffer'},
+  {id:'BN2',  label:'BN · H',       posTypes:['H'],           cls:'',       role:'Multi-pos hitter (2B/SS or 1B/3B)'},
+  {id:'BN3',  label:'BN · H',       posTypes:['H'],           cls:'',       role:'Speed specialist — SB depth'},
+  {id:'BN4',  label:'BN · H',       posTypes:['H'],           cls:'',       role:'Power depth — HR/RBI insurance'},
+  {id:'BN5',  label:'BN · H',       posTypes:['H'],           cls:'',       role:'Young upside hitter age ≤24'},
+  // ── IL (5) ──────────────────────────────────────────────────────
+  {id:'IL1',  label:'IL',           posTypes:['H','SP','RP'], cls:'',       role:'Injured List'},
+  {id:'IL2',  label:'IL',           posTypes:['H','SP','RP'], cls:'',       role:'Injured List'},
+  {id:'IL3',  label:'IL',           posTypes:['H','SP','RP'], cls:'',       role:'Injured List'},
+  {id:'IL4',  label:'IL',           posTypes:['H','SP','RP'], cls:'',       role:'Injured List'},
+  {id:'IL5',  label:'IL',           posTypes:['H','SP','RP'], cls:'',       role:'Injured List'},
+  // ── NA (1) ──────────────────────────────────────────────────────
+  {id:'NA',   label:'NA',           posTypes:['H','SP','RP'], cls:'naslot', role:'Prospect stash — 1 max, age ≤22'},
 ];
 
-// ── Name normalization ─────────────────────────────────────
-function cleanName(name) {
-  if (!name) return '';
-  return name.toString()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '') // strip accents: é→e
-    .toLowerCase()
-    .replace(/[''`´\.]/g, '')         // remove apostrophes/periods
-    .replace(/[^a-z0-9 ]/g, ' ')     // everything else → space
+// ════════════════════════════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════════════════════════════
+const STATE = {
+  players: [],
+  sortCol: 'dynZ',
+  sortDir: -1,
+  filter: 'ALL',
+  search: '',
+  hideDrafted: false,
+  activeTab: 'dashboard',
+  currentPick: 1,
+  drafted: new Set(),
+  myDrafted: [],
+  rosterSlots: {},
+  tradeGive: [],
+  tradeGet: [],
+  waiverFilter: 'ALL',
+  lastSync: null,
+  winNow: true,   // true = win-now balance (user preference)
+};
+
+// ════════════════════════════════════════════════════════════════════
+// UTILITIES
+// ════════════════════════════════════════════════════════════════════
+function cleanName(n) {
+  return (n || '').toLowerCase()
+    .replace(/[''`´]/g, '')
+    .replace(/\./g, '')
+    .replace(/[^a-z0-9 ]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
 
-function nameVariants(name) {
-  const base = cleanName(name);
-  const stripped = base
-    .replace(/\b(jr|sr|ii|iii|iv)\b/g, '')
-    .replace(/\s+/g, ' ').trim();
-  return stripped === base ? [base] : [base, stripped];
+function lookupHKB(name) {
+  const c = cleanName(name);
+  if (HKB_RAW[c]) return HKB_RAW[c];
+  // Try stripping Jr/Sr/II/III/IV suffix
+  const s = c.replace(/\b(jr|sr|ii|iii|iv)\b/g, '').replace(/\s+/g,' ').trim();
+  return HKB_RAW[s] || 0;
 }
 
-// ── Core parser — PROVEN WORKING from testFetch ────────────
-// Key insight: strip ALL html tags first, then split on ‧ (U+2027)
-// The plaintext format is: "...Player Name‧LEVEL‧TEAM · age · pos · VALUE..."
-function parseHKBHtml(html) {
-  const values = {};
-  const HYPHEN = '\u2027'; // ‧
+function getArchetype(age, isProsp) {
+  if (isProsp) return { label: 'PROSP', cls: 'prosp' };
+  if (age <= 22) return { label: 'ELITE', cls: 'prosp' };
+  if (age <= 25) return { label: 'YOUNG', cls: 'young' };
+  if (age <= 28) return { label: 'PRIME', cls: 'prime' };
+  if (age <= 31) return { label: 'AGING', cls: 'aging' };
+  return { label: 'SELL', cls: 'sell' };
+}
 
-  // Step 1: Strip HTML entirely to get clean plaintext
-  const text = html
-    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-    .replace(/&nbsp;/g, ' ').replace(/&#x27;/g, "'")
-    .replace(/\s+/g, ' ');
+function posPill(pos) {
+  const posKey = (pos || '').split('/')[0];
+  return `<span class="pos-pill pos-${posKey}">${pos || '?'}</span>`;
+}
 
-  if (!text.includes(HYPHEN)) return values;
+function slotPill(label, cls) {
+  return `<span class="pos-pill pos-${cls}">${label}</span>`;
+}
 
-  // Step 2: Split on ‧ — each player entry spans two segments:
-  //   segments[i]   ends with "...Player Name"
-  //   segments[i+1] starts with "LEVEL‧TEAM · age · pos · VALUE · ..."
-  const segments = text.split(HYPHEN);
+function fmtN(v, dec) {
+  if (v === null || v === undefined || isNaN(v)) return '—';
+  return Number(v).toFixed(dec !== undefined ? dec : 2);
+}
 
-  for (let i = 0; i < segments.length - 1; i++) {
-    // ── Extract name from end of segments[i] ──────────────
-    const namePart = segments[i].trim();
-    // Take up to last 4 words — the player name
-    const rawWords = namePart.split(' ').filter(w => w.length > 0);
-    const nameWords = rawWords
-      .slice(-4)
-      .join(' ')
-      .replace(/[^a-zA-ZÀ-ÿ\s'.\-]/g, '')
-      .trim();
+function fmtK(n) {
+  if (!n || n === 0) return '—';
+  return n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n);
+}
 
-    if (!nameWords || nameWords.length < 3) continue;
+function deltaClass(d) {
+  if (d >= 25)  return 'delta-big-buy';
+  if (d >= 8)   return 'delta-buy';
+  if (d >= -8)  return 'delta-neut';
+  if (d >= -25) return 'delta-sell';
+  return 'delta-big-sell';
+}
 
-    // ── Extract value from segments[i+1] and optionally [i+2] ─
-    const valuePart = (segments[i+1] + ' ' + (segments[i+2] || '')).substring(0, 150);
+function deltaLabel(d) {
+  if (d >= 25)  return '▲▲ BUY +' + d;
+  if (d >= 8)   return '▲ +' + d;
+  if (d >= -8)  return d > 0 ? '+' + d : (d === 0 ? '—' : String(d));
+  if (d >= -25) return '▼ ' + d;
+  return '▼▼ SELL ' + d;
+}
 
-    // Dynasty values are comma-formatted integers 100-10000
-    // e.g. "10,000" or "1,234" — NOT decimals like "25.7" (age)
-    const valueMatch = valuePart.match(/\b(\d{1,2},\d{3})\b/);
-    if (!valueMatch) continue;
+function statLine(p) {
+  if (p.type === 'SP') return `${p.stat1||'—'}K · ${fmtN(p.stat2,2)} ERA · ${fmtN(p.stat3,3)} WHIP · ${p.stat4||'—'}QS`;
+  if (p.type === 'RP') return `${p.stat1||'—'}K · ${fmtN(p.stat2,2)} ERA · ${fmtN(p.stat3,3)} WHIP · ${p.stat5||'—'}SVH`;
+  return `${p.stat1||'—'}R · ${p.stat2||'—'}HR · ${p.stat3||'—'}RBI · ${p.stat4||'—'}SB · ${fmtN(p.stat5,3)} OPS`;
+}
 
-    const dynasty = parseInt(valueMatch[1].replace(',', ''));
-    if (dynasty < 100 || dynasty > 10000) continue;
+function getRound() { return Math.ceil(STATE.currentPick / CONFIG.N_TEAMS); }
 
-    // ── Store both full name and suffix-stripped variant ───
-    const cn = cleanName(nameWords);
-    if (cn.length > 2 && !values[cn]) {
-      values[cn] = dynasty;
-    }
-    const stripped = cn.replace(/\b(jr|sr|ii|iii|iv)\b/g, '').replace(/\s+/g,' ').trim();
-    if (stripped !== cn && stripped.length > 2 && !values[stripped]) {
-      values[stripped] = dynasty;
-    }
+function isMyPick(overall) { return MY_OVERALL_PICKS.has(overall); }
+
+function esc(s) { return (s || '').replace(/'/g, "\\'"); }
+
+// ════════════════════════════════════════════════════════════════════
+// CSV PARSING
+// ════════════════════════════════════════════════════════════════════
+function parseCSVLine(line) {
+  const result = [];
+  let cur = '', inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') { inQ = !inQ; }
+    else if (c === ',' && !inQ) { result.push(cur); cur = ''; }
+    else { cur += c; }
   }
-
-  return values;
+  result.push(cur);
+  return result;
 }
 
-// ── Fetch one URL ─────────────────────────────────────────
-function fetchOne(url) {
+function pf(v) {
+  if (!v || v === '—' || v === '') return null;
+  const n = parseFloat(String(v).replace(/,/g, ''));
+  return isNaN(n) ? null : n;
+}
+function pi(v) {
+  const n = parseInt(String(v || '').replace(/,/g, ''));
+  return isNaN(n) ? null : n;
+}
+
+async function fetchPlayers() {
+  setProgress(20, 'FETCHING PLAYER DATA FROM GOOGLE SHEETS...');
   try {
-    const resp = UrlFetchApp.fetch(url, {
-      muteHttpExceptions: true,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept': 'text/html,application/xhtml+xml',
-      },
-      followRedirects: true,
-    });
-    if (resp.getResponseCode() !== 200) {
-      Logger.log(`  HTTP ${resp.getResponseCode()} — ${url}`);
-      return {};
+    // 8-second timeout on the fetch itself
+    const controller = new AbortController();
+    const fetchTimer = setTimeout(() => controller.abort(), 8000);
+    let resp;
+    try {
+      resp = await fetch(CONFIG.SHEET_URL, { signal: controller.signal });
+    } finally {
+      clearTimeout(fetchTimer);
     }
-    return parseHKBHtml(resp.getContentText());
-  } catch(e) {
-    Logger.log(`  Error on ${url}: ${e.message}`);
-    return {};
-  }
-}
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const text = await resp.text();
+    const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
 
-// ── Main: scrape all tabs and write to sheet ───────────────
-function scrapeHKBValues() {
-  const ss    = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEET_NAME);
-  if (!sheet) {
-    SpreadsheetApp.getUi().alert(`Sheet "${SHEET_NAME}" not found.`);
-    return;
-  }
+    const players = [];
+    for (let i = 0; i < lines.length; i++) {
+      const cols = parseCSVLine(lines[i]);
+      const type = (cols[5] || '').trim();
+      if (!['H', 'SP', 'RP'].includes(type)) continue;
+      const name = (cols[1] || '').trim();
+      if (!name) continue;
 
-  Logger.log('Scraping HKB across all position tabs...');
-  const all = {};
-
-  for (let i = 0; i < HKB_URLS.length; i++) {
-    const url = HKB_URLS[i];
-    const vals = fetchOne(url);
-    let added = 0;
-    for (const [k,v] of Object.entries(vals)) {
-      if (!all[k]) { all[k] = v; added++; }
-    }
-    const label = url.includes('?') ? url.split('?')[1] : 'all';
-    Logger.log(`  [${label}] ${Object.keys(vals).length} parsed, ${added} new → total ${Object.keys(all).length}`);
-    if (i < HKB_URLS.length - 1) Utilities.sleep(1000);
-  }
-
-  Logger.log(`\nTotal unique players scraped: ${Object.keys(all).length}`);
-
-  if (Object.keys(all).length < 20) {
-    SpreadsheetApp.getUi().alert(
-      '⚠️ Only ' + Object.keys(all).length + ' players found.\n\n' +
-      'HKB page structure may have changed.\nRun testFetch() and check logs to debug.'
-    );
-    return;
-  }
-
-  writeToSheet(sheet, all);
-}
-
-// ── Write values to column Y ──────────────────────────────
-function writeToSheet(sheet, hkbValues) {
-  const lastRow = sheet.getLastRow();
-  if (lastRow <= HEADER_ROW) return;
-
-  sheet.getRange(HEADER_ROW, HKB_COL).setValue('HKB_VALUE');
-
-  const names = sheet
-    .getRange(HEADER_ROW + 1, NAME_COL, lastRow - HEADER_ROW, 1)
-    .getValues();
-
-  const updates = [];
-  let matched = 0;
-  const unmatched = [];
-
-  for (let i = 0; i < names.length; i++) {
-    const raw = (names[i][0] || '').toString().trim();
-    if (!raw) { updates.push(['']); continue; }
-
-    let value = 0;
-
-    // Try exact + suffix-stripped variants
-    for (const variant of nameVariants(raw)) {
-      if (hkbValues[variant]) { value = hkbValues[variant]; break; }
+      players.push({
+        num:    pi(cols[0]),
+        name:   name,
+        pos:    (cols[2] || '').trim(),
+        age:    pi(cols[3]),
+        team:   (cols[4] || '').trim(),
+        type:   type,
+        stat1:  pf(cols[6]),
+        stat2:  pf(cols[7]),
+        stat3:  pf(cols[8]),
+        stat4:  pf(cols[9]),
+        stat5:  pf(cols[10]),
+        dynZ:   pf(cols[18]),
+        poolRk: pi(cols[19]),
+        ovrRk:  pi(cols[20]),
+        prosp:  KNOWN_PROSPECTS.has(cleanName(name)),
+        flag:   (cols[22] || '').trim(),
+        notes:  (cols[23] || '').trim(),
+        // Column Y (index 24) = HKB_VALUE entered manually in Google Sheet.
+        // If populated, use it as the primary HKB source.
+        // Fallback to hardcoded lookup table happens after fetch in the HKB inject step.
+        sheetHKB: pi(cols[24]) || 0,
+        hkb: 0, hkbRank: 0, dynRank: 0, delta: 0, pitchPlus: null,
+      });
     }
 
-    // Fuzzy prefix match as fallback
-    if (!value) {
-      const cn = cleanName(raw);
-      for (const [key, val] of Object.entries(hkbValues)) {
-        if (key.length > 6 && (cn.startsWith(key) || key.startsWith(cn))) {
-          value = val; break;
+    // ── OHTANI DUAL ENTRY ─────────────────────────────────────────────
+    // Sheet has him as DH hitter. Inject a synthetic SP entry for his
+    // pitching value — returning to mound in 2026 after 2024-25 DH only.
+    const ohtaniH = players.find(p => cleanName(p.name) === 'shohei ohtani');
+    if (ohtaniH) {
+      players.push({
+        ...ohtaniH,
+        pos: 'SP',
+        type: 'SP',
+        name: 'Shohei Ohtani (SP)',
+        stat1: 165, stat2: 2.85, stat3: 1.02, stat4: 20, stat5: 0,
+        notes: 'Pitching return 2026 — DH entry ranked separately',
+        hkb: 0, hkbRank: 0, dynRank: 0, delta: 0,
+      });
+    }
+    // ─────────────────────────────────────────────────────────────────
+
+    setProgress(55, 'COMPUTING DELTA RANKINGS...');
+
+    // Inject HKB values — sheet column Y takes priority, hardcoded table as fallback
+    for (const p of players) {
+      p.hkb = p.sheetHKB > 0 ? p.sheetHKB : lookupHKB(p.name);
+    }
+
+    // ── INJECT ENO DATA FIRST (needed for Pitching+ multiplier) ───────
+    players.forEach(p => {
+      if (p.type === 'SP' || p.type === 'RP') {
+        const eno = lookupEno(p.name);
+        if (eno) {
+          p.pitchPlus = eno.p;
+          p.stuffPlus = eno.s;
+          p.locPlus   = eno.l;
+          p.health    = eno.h;
+          p.enoRank   = eno.r;
+          p.enoBlurb  = eno.b;
+          p.ppERA     = eno.era;
         }
       }
-    }
+    });
 
-    if (value > 0) {
-      matched++;
-      updates.push([value]);
+    // ── PITCHING+ MULTIPLIER — applied to SP dynZ before ranking ──────
+    // Eno's Pitching+ is forward-looking (stuff + command).
+    // It catches breakouts and declines the stat projections miss.
+    // Only applied to SPs with a valid Pitching+ score.
+    // Multipliers: ≥118 elite +12%, 110-117 good +5%,
+    //              103-109 average ±0%, 97-102 below -8%, <97 poor -15%
+    players.forEach(p => {
+      if (p.type !== 'SP' || !p.pitchPlus || p.dynZ === null) return;
+      let mult = 1.0;
+      if      (p.pitchPlus >= 118) mult = 1.12;
+      else if (p.pitchPlus >= 110) mult = 1.05;
+      else if (p.pitchPlus >= 103) mult = 1.00;
+      else if (p.pitchPlus >= 97)  mult = 0.92;
+      else                          mult = 0.85;
+      p.dynZRaw   = p.dynZ;        // preserve original for display
+      p.pitchMult = mult;
+      p.dynZ      = p.dynZ * mult;
+    });
+
+    // Rank by dynZ descending (now Pitching+-adjusted for SPs)
+    const byDyn = [...players].sort((a, b) => (b.dynZ || -99) - (a.dynZ || -99));
+    byDyn.forEach((p, i) => { p.dynRank = i + 1; });
+
+    // Rank by HKB descending — no-HKB players go to the bottom
+    const withHKB    = players.filter(p => p.hkb > 0).sort((a, b) => b.hkb - a.hkb);
+    const withoutHKB = players.filter(p => p.hkb === 0);
+    withHKB.forEach((p, i) => { p.hkbRank = i + 1; });
+    withoutHKB.forEach((p, i) => { p.hkbRank = withHKB.length + i + 1; });
+
+    // Delta: positive = we rank higher than market = BUY opportunity
+    players.forEach(p => { p.delta = p.hkb > 0 ? p.hkbRank - p.dynRank : 0; });
+
+    STATE.players = players;
+    STATE.lastSync = new Date().toLocaleTimeString();
+    return players;
+  } catch (e) {
+    console.error('Fetch error:', e);
+    setProgress(100, 'ERROR — check console. Using any cached data.');
+    return STATE.players;
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// PERSISTENCE
+// ════════════════════════════════════════════════════════════════════
+function saveState() {
+  try {
+    localStorage.setItem('cnah26_drafted',     JSON.stringify([...STATE.drafted]));
+    localStorage.setItem('cnah26_myDraftedNames', JSON.stringify(STATE.myDrafted.map(p => p.name)));
+    localStorage.setItem('cnah26_rosterSlots', JSON.stringify(STATE.rosterSlots));
+    localStorage.setItem('cnah26_currentPick', STATE.currentPick);
+  } catch (e) { console.warn('Save failed', e); }
+}
+
+function loadState() {
+  try {
+    const d = localStorage.getItem('cnah26_drafted');
+    if (d) STATE.drafted = new Set(JSON.parse(d));
+    const cp = localStorage.getItem('cnah26_currentPick');
+    if (cp) STATE.currentPick = parseInt(cp) || 1;
+    const rs = localStorage.getItem('cnah26_rosterSlots');
+    if (rs) STATE.rosterSlots = JSON.parse(rs);
+  } catch (e) { console.warn('Load failed', e); }
+}
+
+function restoreMyDrafted() {
+  try {
+    const saved = localStorage.getItem('cnah26_myDraftedNames');
+    if (saved) {
+      const names = JSON.parse(saved);
+      STATE.myDrafted = names.map(n => STATE.players.find(p => p.name === n)).filter(Boolean);
+    }
+  } catch (e) {}
+}
+
+function resetDraft() {
+  if (!confirm('Reset the entire draft board? This will clear all drafted players and pick history. Cannot be undone.')) return;
+  STATE.drafted = new Set();
+  STATE.myDrafted = [];
+  STATE.rosterSlots = {};
+  STATE.currentPick = 1;
+  saveState();
+  renderAll();
+}
+
+// ════════════════════════════════════════════════════════════════════
+// FILTERING + SORTING
+// ════════════════════════════════════════════════════════════════════
+function getFiltered() {
+  let p = STATE.players;
+  const f = STATE.filter;
+  if (f === 'H')    p = p.filter(x => x.type === 'H');
+  else if (f === 'SP')   p = p.filter(x => x.type === 'SP');
+  else if (f === 'RP')   p = p.filter(x => x.type === 'RP');
+  else if (f === 'PROSP') p = p.filter(x => x.prosp);
+  else if (['C','1B','2B','3B','SS','OF','DH'].includes(f)) {
+    p = p.filter(x => x.pos === f || x.pos.startsWith(f + '/') || x.pos.includes('/' + f));
+  }
+  if (STATE.search) {
+    const q = STATE.search.toLowerCase();
+    p = p.filter(x => x.name.toLowerCase().includes(q) || (x.team||'').toLowerCase().includes(q) || (x.pos||'').toLowerCase().includes(q));
+  }
+  if (STATE.hideDrafted) p = p.filter(x => !STATE.drafted.has(x.name));
+
+  return [...p].sort((a, b) => {
+    let av = a[STATE.sortCol], bv = b[STATE.sortCol];
+    const INF = STATE.sortDir > 0 ? Infinity : -Infinity;
+    if (av === null || av === undefined) av = INF;
+    if (bv === null || bv === undefined) bv = INF;
+    if (typeof av === 'string') return STATE.sortDir * av.localeCompare(bv);
+    return STATE.sortDir * (av - bv);
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════
+// RENDER: PLAYER TABLE
+// ════════════════════════════════════════════════════════════════════
+function renderPlayerTable() {
+  const tbody = document.getElementById('playerTbody');
+  if (!tbody) return;
+  const players = getFiltered();
+  const myTurn = isMyPick(STATE.currentPick);
+
+  let html = '';
+  for (const p of players) {
+    const drafted    = STATE.drafted.has(p.name);
+    const isMine     = STATE.myDrafted.some(x => x.name === p.name);
+    const arch       = getArchetype(p.age, p.prosp);
+    const delta      = p.hkb > 0 ? Math.round(p.delta) : null;
+    const ageColor   = p.age <= 24 ? 'var(--blue)' : p.age <= 27 ? 'var(--green)' : p.age <= 30 ? 'var(--gold)' : 'var(--red)';
+    const dynColor   = (p.dynZ||0) > 0.5 ? 'var(--green)' : (p.dynZ||0) > 0 ? 'var(--accent)' : 'var(--text-muted)';
+
+    let rowCls = '';
+    if (drafted && isMine)    rowCls = 'my-drafted-row';
+    else if (drafted)         rowCls = 'drafted-row';
+    else if (myTurn)          rowCls = 'on-clock-row';
+
+    const nameExtra = p.prosp ? '<span class="badge badge-prosp" style="margin-left:4px">PROSP</span>' : '';
+    const flagExtra = p.flag  ? `<span style="font-size:11px;margin-left:2px" title="${p.flag}">${p.flag}</span>` : '';
+
+    const draftHtml = drafted
+      ? `<button class="undo-btn" onclick="undraftPlayer('${esc(p.name)}')">✕ undo</button>`
+      : `<button class="draft-btn${myTurn ? ' my-turn' : ''}" onclick="draftPlayer('${esc(p.name)}')">${myTurn ? '◀ MINE' : 'DRAFT'}</button>`;
+
+    // Eno data for pitchers
+    const isPitcher = p.type === 'SP' || p.type === 'RP';
+    const pitchPlusCell = isPitcher && p.pitchPlus
+      ? `<span style="font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:700;color:${pitchPlusColor(p.pitchPlus)}">${p.pitchPlus}</span>${p.enoRank ? `<span style="font-size:9px;color:var(--text-muted);margin-left:3px">ENO#${p.enoRank}</span>` : ''}`
+      : `<span style="color:var(--text-muted)">—</span>`;
+
+    const stuffLocHealth = isPitcher && (p.stuffPlus || p.health)
+      ? `<span class="mono" style="font-size:10px;color:var(--text-dim)">${p.stuffPlus||'—'} · ${p.locPlus||'—'} · <span style="color:${healthColor(p.health)};font-weight:600">${p.health||'—'}</span></span>`
+      : `<span style="color:var(--text-muted)">—</span>`;
+
+    // Blurb tooltip on name (pitcher only, truncated)
+    const blurbTitle = p.enoBlurb ? p.enoBlurb.replace(/"/g,"'") : '';
+    const nameTitle  = blurbTitle ? ` title="${blurbTitle}"` : '';
+
+    html += `<tr class="${rowCls}" id="row-${p.name.replace(/[^a-z0-9]/gi,'_')}">
+      <td class="mono" style="font-size:11px;color:var(--text-muted);font-weight:600">${p.ovrRk || '—'}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          ${posPill(p.pos)}
+          <span style="font-weight:600;font-size:14px;color:var(--text);cursor:${blurbTitle?'help':'default'}"${nameTitle}>${p.name}</span>
+          ${nameExtra}${flagExtra}
+        </div>
+        <div style="margin-top:3px;display:flex;align-items:center;gap:5px">
+          <span class="badge badge-${arch.cls}">${arch.label}</span>
+          <span class="mono" style="font-size:9px;color:var(--text-muted)">#${p.poolRk||'—'} pool</span>
+        </div>
+      </td>
+      <td class="mono" style="font-size:13px;color:${ageColor};font-weight:700">${p.age || '—'}</td>
+      <td class="mono" style="font-size:11px;color:var(--text-dim)">${p.team || '—'}</td>
+      <td>${p.type === 'SP' ? '<span class="badge badge-aging">SP</span>' : p.type === 'RP' ? '<span class="badge badge-sell">RP</span>' : '<span class="badge badge-young">H</span>'}</td>
+      <td class="mono" style="font-size:10px;color:var(--text-dim);white-space:nowrap">${statLine(p)}</td>
+      <td style="white-space:nowrap">${pitchPlusCell}</td>
+      <td>${stuffLocHealth}</td>
+      <td class="mono" style="font-size:13px;color:${dynColor};font-weight:700">
+        ${p.dynZ !== null ? fmtN(p.dynZ, 3) : '—'}
+        ${p.pitchMult && p.pitchMult !== 1.0
+          ? `<span style="font-size:8px;margin-left:3px;color:${p.pitchMult>1?'var(--green)':'var(--red)'}">
+              ${p.pitchMult>1?'▲':'▼'}P+</span>`
+          : ''}
+      </td>
+      <td class="mono" style="font-size:13px;color:var(--purple);font-weight:600">${p.hkb > 0 ? fmtK(p.hkb) : '—'}</td>
+      <td class="mono ${delta !== null ? deltaClass(delta) : ''}" style="font-size:11px;font-weight:700" title="HKB rank: ${p.hkbRank} | DYN rank: ${p.dynRank}">${delta !== null ? deltaLabel(delta) : '—'}</td>
+      <td style="font-size:10px;color:var(--text-dim);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${p.notes}">${p.notes || ''}</td>
+      <td>${draftHtml}</td>
+    </tr>`;
+  }
+
+  tbody.innerHTML = html || `<tr><td colspan="11" style="text-align:center;padding:32px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:1px">NO PLAYERS FOUND</td></tr>`;
+}
+
+// ════════════════════════════════════════════════════════════════════
+// RENDER: PICK PANEL
+// ════════════════════════════════════════════════════════════════════
+function renderPickPanel() {
+  const g = id => document.getElementById(id);
+
+  // Stat cards
+  const avail = STATE.players.filter(p => !STATE.drafted.has(p.name)).length;
+  if (g('sc-drafted')) g('sc-drafted').textContent = STATE.drafted.size;
+  if (g('sc-mypicks')) g('sc-mypicks').textContent = STATE.myDrafted.length + '/23';
+  if (g('sc-avail'))   g('sc-avail').textContent   = avail;
+  if (g('sc-round'))   g('sc-round').textContent   = getRound();
+
+  // Header
+  if (g('hdrPickNum')) g('hdrPickNum').textContent = STATE.currentPick;
+  const myTurn = isMyPick(STATE.currentPick);
+  const banner = g('yourPickBanner');
+  if (banner) banner.style.display = myTurn ? 'block' : 'none';
+  const ls = g('lastSync');
+  if (ls && STATE.lastSync) ls.textContent = 'Last sync: ' + STATE.lastSync;
+
+  // Countdown clock
+  const cdNum = g('countdownNum');
+  const cdLbl = g('countdownLbl');
+  const cdCard = g('countdownCard');
+  if (cdNum && cdLbl) {
+    const nextMyPick = SNAKE_PICKS.find(sp => sp.overall >= STATE.currentPick);
+    if (!nextMyPick || STATE.currentPick > CONFIG.TOTAL_PICKS) {
+      cdNum.textContent = '✓';
+      cdNum.style.color = 'var(--green)';
+      cdLbl.textContent = 'Draft Complete';
+      if (cdCard) cdCard.style.borderColor = 'var(--green)';
+    } else if (isMyPick(STATE.currentPick)) {
+      cdNum.textContent = 'NOW';
+      cdNum.style.color = 'var(--accent)';
+      cdNum.style.fontSize = '32px';
+      cdLbl.textContent = '🎯 YOUR PICK — ON THE CLOCK';
+      if (cdCard) { cdCard.style.border = '2px solid var(--accent)'; }
     } else {
-      unmatched.push(raw);
-      updates.push(['']);
+      const picksAway = nextMyPick.overall - STATE.currentPick;
+      cdNum.textContent = picksAway;
+      cdNum.style.fontSize = '42px';
+      cdNum.style.color = picksAway <= 2 ? 'var(--red)' : picksAway <= 5 ? 'var(--orange)' : 'var(--accent)';
+      cdLbl.textContent = `Pick${picksAway===1?'':'s'} Until Your Turn (Rd ${nextMyPick.round}, #${nextMyPick.overall})`;
+      if (cdCard) cdCard.style.border = '1px solid var(--border)';
+    }
+  }
+  const pickListEl = g('pickListEl');
+  if (pickListEl) {
+    const currIdx = SNAKE_PICKS.findIndex(p => p.overall >= STATE.currentPick);
+    const start = Math.max(0, currIdx - 1);
+    const visible = SNAKE_PICKS.slice(start, start + 9);
+
+    let html = '';
+    for (const sp of visible) {
+      const used     = sp.overall < STATE.currentPick;
+      const onClock  = sp.overall === STATE.currentPick;
+      const myPlayer = STATE.myDrafted[SNAKE_PICKS.indexOf(sp)];
+
+      let cls = 'pick-item';
+      if (onClock) cls += ' your-turn';
+      else if (used && myPlayer) cls += ' my-pick used';
+      else if (used) cls += ' used';
+      else cls += ' my-pick';
+
+      const rdCls = 'pick-rd mine';
+      const nameTxt = myPlayer
+        ? myPlayer.name
+        : onClock ? '— ON CLOCK —' : '...';
+      const nameCls = myPlayer ? 'pick-name' : 'pick-name empty';
+
+      html += `<div class="${cls}">
+        <span class="${rdCls}">R${sp.round}</span>
+        <span class="pick-ovr">#${sp.overall}</span>
+        <span class="${nameCls}">${nameTxt}</span>
+        ${myPlayer ? posPill(myPlayer.pos) : ''}
+      </div>`;
+    }
+    pickListEl.innerHTML = html || '<div class="mono muted" style="padding:8px;font-size:11px">Draft not started</div>';
+  }
+
+  // Mini roster
+  const mini = g('miniRosterEl');
+  if (mini) {
+    if (!STATE.myDrafted.length) {
+      mini.innerHTML = '<div class="mono muted" style="font-size:11px;padding:8px">No picks yet</div>';
+    } else {
+      mini.innerHTML = [...STATE.myDrafted].slice(-6).reverse().map(p => `
+        <div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid rgba(46,46,74,0.3)">
+          ${posPill(p.pos)}
+          <span style="font-size:11px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}</span>
+          <span class="mono" style="font-size:9px;color:var(--text-muted)">#${p.ovrRk}</span>
+        </div>`).join('');
+    }
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// RENDER: MY ROSTER TAB
+// ════════════════════════════════════════════════════════════════════
+function renderMyRoster() {
+  const count = STATE.myDrafted.length;
+  const validDZ = STATE.myDrafted.filter(p => p.dynZ !== null);
+  const validHKB = STATE.myDrafted.filter(p => p.hkb > 0);
+  const avgDynZ = validDZ.length ? (validDZ.reduce((s, p) => s + p.dynZ, 0) / validDZ.length) : null;
+  const avgHKB  = validHKB.length ? (validHKB.reduce((s, p) => s + p.hkb, 0) / validHKB.length) : null;
+  const avgAge  = count ? (STATE.myDrafted.reduce((s, p) => s + (p.age || 0), 0) / count) : null;
+
+  const si = id => document.getElementById(id);
+  if (si('rs-count'))   si('rs-count').textContent   = count;
+  if (si('rs-avgdynz')) si('rs-avgdynz').textContent = avgDynZ !== null ? fmtN(avgDynZ, 3) : '—';
+  if (si('rs-avghkb'))  si('rs-avghkb').textContent  = avgHKB  ? fmtK(Math.round(avgHKB)) : '—';
+  if (si('rs-avgage'))  si('rs-avgage').textContent  = avgAge  !== null ? avgAge.toFixed(1) : '—';
+
+  // Roster slots
+  const slotsEl = document.getElementById('rosterSlotsEl');
+  if (slotsEl) {
+    const SLOT_COLORS = {C:'#00d4ff','1B':'#4cff91','2B':'#4cff91','3B':'#ff8c42',SS:'#4ca9ff',OF:'#ffd700',UTIL:'#9090b0',SP:'#b44cff',RP:'#ff4444',P:'#4cff91',BN:'#60607a',IL:'#ff4444',NA:'#b44cff'};
+    slotsEl.innerHTML = ROSTER_SLOTS.map(slot => {
+      const pName  = STATE.rosterSlots[slot.id];
+      const player = pName ? STATE.players.find(p => p.name === pName) : null;
+      const slotKey = slot.label.replace('-FLEX','').replace('P','P');
+      const col = SLOT_COLORS[slot.label.replace('-FLEX','')] || SLOT_COLORS[slot.id.replace(/\d/,'')] || '#60607a';
+      return `<div class="roster-slot ${player ? 'filled' : ''} ${slot.cls}">
+        <span class="slot-lbl" style="color:${col}">${slot.label}</span>
+        <span class="slot-player ${player ? 'filled' : ''}">${player ? player.name : '—'}</span>
+        ${player ? posPill(player.pos) : ''}
+      </div>`;
+    }).join('');
+  }
+
+  // Drafted players table
+  const tbody = document.getElementById('myRosterTbody');
+  if (tbody) {
+    if (!count) {
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;font-size:11px">No players drafted yet</td></tr>`;
+    } else {
+      tbody.innerHTML = [...STATE.myDrafted]
+        .sort((a, b) => (a.ovrRk || 999) - (b.ovrRk || 999))
+        .map(p => {
+          const delta = p.hkb > 0 ? Math.round(p.delta) : null;
+          return `<tr>
+            <td class="mono" style="font-size:10px;color:var(--text-muted)">${p.ovrRk || '—'}</td>
+            <td style="font-weight:500;font-size:12px">${p.name} ${p.prosp ? '<span class="badge badge-prosp">PROSP</span>' : ''}</td>
+            <td>${posPill(p.pos)}</td>
+            <td class="mono" style="font-size:11px">${p.age || '—'}</td>
+            <td class="mono" style="font-size:10px;color:var(--text-dim)">${p.team || '—'}</td>
+            <td class="mono" style="font-size:11px;color:var(--green);font-weight:600">${p.dynZ !== null ? fmtN(p.dynZ, 3) : '—'}</td>
+            <td class="mono" style="font-size:11px;color:var(--purple)">${p.hkb > 0 ? fmtK(p.hkb) : '—'}</td>
+            <td class="mono ${delta !== null ? deltaClass(delta) : ''}" style="font-size:10px">${delta !== null ? deltaLabel(delta) : '—'}</td>
+            <td><button class="undo-btn" onclick="undraftPlayer('${esc(p.name)}')">✕</button></td>
+          </tr>`;
+        }).join('');
+    }
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// DRAFT ACTIONS
+// ════════════════════════════════════════════════════════════════════
+function draftPlayer(name) {
+  if (STATE.drafted.has(name)) return;
+  const player = STATE.players.find(p => p.name === name);
+  if (!player) return;
+
+  STATE.drafted.add(name);
+  if (isMyPick(STATE.currentPick)) {
+    STATE.myDrafted.push(player);
+    autoAssignSlot(player);
+  }
+  STATE.currentPick++;
+  saveState();
+  renderAll();
+}
+
+function undraftPlayer(name) {
+  if (!STATE.drafted.has(name)) return;
+  STATE.drafted.delete(name);
+  const idx = STATE.myDrafted.findIndex(p => p.name === name);
+  if (idx !== -1) {
+    STATE.myDrafted.splice(idx, 1);
+    for (const sid in STATE.rosterSlots) {
+      if (STATE.rosterSlots[sid] === name) delete STATE.rosterSlots[sid];
+    }
+    if (STATE.currentPick > 1) STATE.currentPick--;
+  }
+  saveState();
+  renderAll();
+}
+
+function advancePick() {
+  if (STATE.currentPick < CONFIG.TOTAL_PICKS) {
+    STATE.currentPick++;
+    saveState();
+    renderAll();
+  }
+}
+
+function toggleHideDrafted(btn) {
+  STATE.hideDrafted = !STATE.hideDrafted;
+  btn.classList.toggle('active', STATE.hideDrafted);
+  renderPlayerTable();
+}
+
+function autoAssignSlot(player) {
+  const pos  = player.pos.split('/')[0];
+  const type = player.type;
+  const my   = STATE.myDrafted;
+
+  // Count what's already assigned
+  const spFilled  = my.filter(p=>p.type==='SP'&&!p.name.includes('(SP)')).length;
+  const rpFilled  = my.filter(p=>p.type==='RP').length;
+  const bnSPFilled = my.filter(p=>p.type==='SP'&&STATE.rosterSlots['BN1']===p.name).length;
+
+  // SP assignment: SP1 → SP2 → P1(SP3) → BN1 → bench overflow
+  if (type === 'SP') {
+    const spOrder = ['SP1','SP2','P1','BN1'];
+    for (const sid of spOrder) {
+      if (!STATE.rosterSlots[sid]) { STATE.rosterSlots[sid] = player.name; return; }
+    }
+    // All SP slots full — overflow to hitter bench (shouldn't happen with constitution)
+    for (const sid of ['BN2','BN3','BN4','BN5']) {
+      if (!STATE.rosterSlots[sid]) { STATE.rosterSlots[sid] = player.name; return; }
+    }
+    return;
+  }
+
+  // RP assignment: RP1 → RP2 → P2 → P3 — NEVER bench
+  if (type === 'RP') {
+    const rpOrder = ['RP1','RP2','P2','P3'];
+    for (const sid of rpOrder) {
+      if (!STATE.rosterSlots[sid]) { STATE.rosterSlots[sid] = player.name; return; }
+    }
+    // All closer slots full — do NOT put on bench per constitution
+    return;
+  }
+
+  // Hitter assignment by position priority
+  const priority = {
+    'C':   ['C',   'UTIL','BN2','BN3','BN4','BN5'],
+    '1B':  ['1B',  'UTIL','BN2','BN3','BN4','BN5'],
+    '2B':  ['2B',  'UTIL','BN2','BN3','BN4','BN5'],
+    '3B':  ['3B',  'UTIL','BN2','BN3','BN4','BN5'],
+    'SS':  ['SS',  'UTIL','BN2','BN3','BN4','BN5'],
+    'OF':  ['OF1','OF2','OF3','UTIL','BN2','BN3','BN4','BN5'],
+    'DH':  ['UTIL','BN2','BN3','BN4','BN5'],
+  };
+  const candidates = priority[pos] || ['UTIL','BN2','BN3','BN4','BN5'];
+
+  // Check multi-pos eligibility — try each eligible position
+  const eligiblePos = player.pos.split('/');
+  for (const epos of eligiblePos) {
+    const slots = priority[epos.trim()] || [];
+    for (const sid of slots) {
+      if (!STATE.rosterSlots[sid]) { STATE.rosterSlots[sid] = player.name; return; }
     }
   }
 
-  // Single batch write
-  sheet.getRange(HEADER_ROW + 1, HKB_COL, updates.length, 1).setValues(updates);
-  SpreadsheetApp.getActiveSpreadsheet().toast(`HKB updated: ${matched} players matched`, '✅ Done', 5);
-
-  const msg = `✅ HKB Update Complete!\n\n`
-    + `Scraped from HKB: ${Object.keys(hkbValues).length} players\n`
-    + `Matched to your sheet: ${matched}\n`
-    + `Unmatched: ${unmatched.length}\n\n`
-    + (unmatched.length > 0
-        ? `First 15 unmatched:\n${unmatched.slice(0,15).join('\n')}`
-        : '🎉 All players matched!');
-
-  Logger.log(msg);
-  SpreadsheetApp.getUi().alert(msg);
-}
-
-// ── Quick test — no writes ────────────────────────────────
-function testFetch() {
-  Logger.log('=== TEST: main page only ===');
-  const vals = fetchOne('https://harryknowsball.com/rankings');
-  Logger.log(`Found ${Object.keys(vals).length} players`);
-  Object.entries(vals).slice(0, 20).forEach(([k,v]) => Logger.log(`  ${k}: ${v}`));
-}
-
-// ── Full test across all tabs — no writes ─────────────────
-function testAllTabs() {
-  Logger.log('=== TEST ALL TABS ===');
-  const all = {};
-  for (const url of HKB_URLS) {
-    const vals = fetchOne(url);
-    let n = 0;
-    for (const [k,v] of Object.entries(vals)) { if (!all[k]) { all[k] = v; n++; } }
-    const label = url.includes('?') ? url.split('?')[1] : 'all';
-    Logger.log(`  [${label}] ${Object.keys(vals).length} parsed, ${n} new → total ${Object.keys(all).length}`);
-    Utilities.sleep(800);
+  // Prospect → NA slot
+  if (player.prosp && !STATE.rosterSlots['NA']) {
+    STATE.rosterSlots['NA'] = player.name; return;
   }
-  Logger.log(`\nGrand total: ${Object.keys(all).length} unique players`);
-  Logger.log('Sample (first 30):');
-  Object.entries(all).slice(0,30).forEach(([k,v]) => Logger.log(`  ${k}: ${v}`));
+
+  // Final fallback
+  for (const sid of candidates) {
+    if (!STATE.rosterSlots[sid]) { STATE.rosterSlots[sid] = player.name; return; }
+  }
 }
 
-// ── Weekly auto-trigger ───────────────────────────────────
-function createWeeklyTrigger() {
-  ScriptApp.getProjectTriggers()
-    .filter(t => t.getHandlerFunction() === 'scrapeHKBValues')
-    .forEach(t => ScriptApp.deleteTrigger(t));
-  ScriptApp.newTrigger('scrapeHKBValues')
-    .timeBased().onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(9).create();
-  SpreadsheetApp.getUi().alert('✅ Auto-trigger set — HKB updates every Monday 9am.');
+// ════════════════════════════════════════════════════════════════════
+// DRAFT CONSTITUTION — Chief Noc-A-Homa · Final · Split A
+// ────────────────────────────────────────────────────────────────────
+// ACTIVE:  C·1B·2B·3B·SS·OF×3·UTIL | SP1·SP2·RP1·RP2·P1(SP3)·P2(CL)·P3(CL)
+// BENCH:   BN1(SP) · BN2-5(H) · NA(1 prospect max)
+// RULES:   4 SPs total (SP1·SP2·P1·BN1) | 4 closers (RP1·RP2·P2·P3)
+//          No RP on bench ever | SP allowed on bench
+//          1 prospect max in NA | Age 35+ only rounds 20+
+// WIN-NOW: Prefer age ≤32 contributors | Fill positional gaps within 2 picks
+// ════════════════════════════════════════════════════════════════════
+const CONSTITUTION = {
+  // Pitching structure
+  SP_ACTIVE:          2,    // SP1, SP2
+  SP_PFLEX:           1,    // P1 = SP3
+  SP_BENCH:           1,    // BN1 = SP injury buffer
+  SP_TOTAL:           4,    // SP1+SP2+P1+BN1
+  RP_ACTIVE:          2,    // RP1, RP2 — elite closers only
+  RP_PFLEX:           2,    // P2, P3 — closers with stellar ratios
+  CLOSER_TOTAL:       4,    // RP1+RP2+P2+P3
+  // Closer quality thresholds for P-flex slots
+  CLOSER_SVH_MIN:     25,
+  CLOSER_ERA_MAX:     3.20,
+  CLOSER_WHIP_MAX:    1.15,
+  // SP quality thresholds
+  ACE_HKB_MIN:        4000,
+  ACE_PITCH_PLUS:     115,
+  // Bench hitters: BN2-5 = 4 hitters (multi-pos, speed, power, young)
+  BENCH_H_SLOTS:      4,
+  // Prospects
+  MAX_PROSPECTS:      1,
+  PROSPECT_AGE_MAX:   22,
+  PROSPECT_RD_MIN:    14,   // don't stash a prospect before round 14
+  // General
+  VET_AGE_CUTOFF:     35,   // avoid 35+ before round 20
+  VET_ROUND_MIN:      20,
+  GAP_GRACE_PICKS:    2,    // picks a positional gap is tolerated before force-fill
+};
+
+// ════════════════════════════════════════════════════════════════════
+// POSITIONAL URGENCY THRESHOLDS — round-based, not pick-count based
+// Each position has a WARN round and a FORCE round.
+// WARN  = advice bar starts flagging it (yellow/orange)
+// FORCE = TAKE engine overrides BDA and fills it immediately (red)
+// Thresholds based on dynasty scarcity at each position.
+// ════════════════════════════════════════════════════════════════════
+const POS_URGENCY = {
+  //       warn  force
+  SS:   { warn: 2,  force: 4  },  // scarcest position — fills fastest
+  C:    { warn: 5,  force: 8  },  // only 2-3 worth owning in any league
+  '1B': { warn: 3,  force: 6  },  // deep but important for scoring
+  '3B': { warn: 4,  force: 7  },
+  '2B': { warn: 4,  force: 7  },
+  OF:   { warn: 3,  force: 6  },  // 3 slots — need at least 1 by R6
+};
+
+function getPosGaps() {
+  // Returns array of {pos, urgency:'warn'|'force', best} sorted by urgency
+  const my = STATE.myDrafted;
+  const round = getRound();
+  const avail = p => !STATE.drafted.has(p.name);
+  const noPros = p => !p.prosp && (p.hkb||0) >= 500;
+
+  const has = pos => my.some(p => p.pos===pos||p.pos.startsWith(pos+'/')||p.pos.includes('/'+pos));
+  const ofCount = my.filter(p => p.pos==='OF'||p.pos.startsWith('OF/')).length;
+
+  const gaps = [];
+  const posStates = {
+    SS:   !has('SS'),
+    C:    !has('C'),
+    '1B': !has('1B'),
+    '3B': !has('3B'),
+    '2B': !has('2B'),
+    OF:   ofCount < 1,
+  };
+
+  for (const [pos, isEmpty] of Object.entries(posStates)) {
+    if (!isEmpty) continue;
+    const thresh = POS_URGENCY[pos];
+    if (!thresh || round < thresh.warn) continue;
+
+    const urgency = round >= thresh.force ? 'force' : 'warn';
+    const pool = STATE.players.filter(p => avail(p) && noPros(p) &&
+      (p.pos===pos||p.pos.startsWith(pos+'/')||p.pos.includes('/'+pos))
+    ).sort((a,b)=>(b.hkb||0)-(a.hkb||0));
+
+    if (pool.length) gaps.push({ pos, urgency, best: pool[0], round: thresh.force });
+  }
+
+  // Sort: force > warn, then by force round (most urgent first)
+  gaps.sort((a,b) => {
+    if (a.urgency !== b.urgency) return a.urgency==='force' ? -1 : 1;
+    return a.round - b.round;
+  });
+  return gaps;
 }
+
+// Keep updateGapTracker as a no-op — replaced by getPosGaps()
+function updateGapTracker() {}
+const GAP_TRACKER = {};
+
+function getTakeRecommendation() {
+  if (!STATE.players.length) return null;
+  const my    = STATE.myDrafted;
+  const round = getRound();
+  const avail = p => !STATE.drafted.has(p.name) && !p.name.includes('(SP)');
+  const C = CONSTITUTION;
+
+  // ── Roster counts ─────────────────────────────────────────────────
+  const mySPs   = my.filter(p => p.type==='SP' && !p.name.includes('(SP)'));
+  const myRPs   = my.filter(p => p.type==='RP');
+  const myProsp = my.filter(p => p.prosp);
+  const spCount = mySPs.length;
+  const rpCount = myRPs.length;
+  const hasAce  = mySPs.some(p=>(p.hkb||0)>=C.ACE_HKB_MIN||(p.pitchPlus||0)>=C.ACE_PITCH_PLUS);
+  const hasSP2  = spCount >= 2;
+  const spFull  = spCount >= C.SP_TOTAL;   // 4 SPs: SP1+SP2+P1+BN1
+  const rpFull  = rpCount >= C.CLOSER_TOTAL; // 4 closers: RP1+RP2+P2+P3
+
+  // ── Available pools sorted by HKB desc ────────────────────────────
+  const pool   = STATE.players.filter(avail).sort((a,b)=>(b.hkb||0)-(a.hkb||0));
+  const poolSP = pool.filter(p=>p.type==='SP');
+  const poolRP = pool.filter(p=>p.type==='RP');
+  const poolH  = pool.filter(p=>p.type==='H');
+
+  // Quality sub-pools
+  const aces    = poolSP.filter(p=>(p.hkb||0)>=C.ACE_HKB_MIN||(p.pitchPlus||0)>=C.ACE_PITCH_PLUS);
+  const eliteRP = poolRP.filter(p=>
+    (p.stat5||0)>=C.CLOSER_SVH_MIN &&
+    (p.stat2||99)<=C.CLOSER_ERA_MAX &&
+    (p.stat3||99)<=C.CLOSER_WHIP_MAX
+  );
+  const solidRP = poolRP.filter(p=>(p.stat5||0)>=C.CLOSER_SVH_MIN);
+
+  // BDA pool — win-now filtered, no bench violations
+  const bdaPool = pool.filter(p=>{
+    if (p.prosp && myProsp.length >= C.MAX_PROSPECTS) return false;
+    if ((p.age||0) >= C.VET_AGE_CUTOFF && round < C.VET_ROUND_MIN) return false;
+    if (p.type==='RP' && rpFull) return false;
+    if (p.type==='SP' && spFull) return false;
+    return true;
+  });
+  // BDA: allow elite prospects (HKB ≥ 4k) if prospect slot is open.
+  // Low-value prospects (<4k HKB) are excluded from BDA —
+  // they belong in the NA stash logic, not as primary picks.
+  // The MAX_PROSPECTS cap is already enforced in bdaPool above.
+  const ELITE_PROSP_HKB = 4000;
+  const bda = bdaPool
+    .filter(p => (p.age||99)<=32 && (p.hkb||0)>500 &&
+      (!p.prosp || (p.hkb||0) >= ELITE_PROSP_HKB)
+    )
+    .sort((a,b) => (b.hkb||0)-(a.hkb||0))[0]
+    || bdaPool[0];
+
+  // ── PRIORITY 0: Round 1 — always best elite hitter, never SP ─────
+  // In round 1 your pick is too valuable to spend on a pitcher.
+  // The dynasty window on a 25-year-old hitter outlasts any SP.
+  if (round === 1) {
+    const eliteH = bdaPool.filter(p=>p.type==='H'&&(p.hkb||0)>=4000&&
+      (!p.prosp||(p.hkb||0)>=ELITE_PROSP_HKB))[0]
+                || bdaPool.filter(p=>p.type==='H'&&!p.prosp)[0];
+    if (eliteH) return {
+      player:eliteH, tag:'R1 · BDA', color:'var(--accent)',
+      reason:`Round 1 rule: always best elite hitter. HKB ${fmtK(eliteH.hkb||0)} · Age ${eliteH.age} · ${eliteH.pos}. SPs can wait — dynasty windows can't.`,
+    };
+  }
+
+  // ── PRIORITY 1: Force-fill urgent positional gaps ─────────────────
+  // Uses round-based thresholds — not triggered until position
+  // genuinely dries up. Never fills with a prospect.
+  const gaps = getPosGaps();
+  const forceGap = gaps.find(g=>g.urgency==='force');
+  if (forceGap) return {
+    player:forceGap.best, tag:`FILL ${forceGap.pos}`, color:'var(--red)',
+    reason:`${forceGap.pos} still empty in round ${round} — costing you category points every week. Non-negotiable fill.`,
+  };
+
+  // ── PRIORITY 2: Ace SP if none — but only if BDA isn't elite ─────
+  // Never recommend an ace SP over a player with significantly
+  // higher HKB. If a franchise hitter is available, take them first.
+  if (!hasAce && aces.length && round <= 9) {
+    const aceHKB = aces[0].hkb || 0;
+    const bdaHKB = bda?.hkb || 0;
+    // Only push ace if no franchise-caliber hitter is clearly better
+    // Threshold: BDA must be worth < 1.5× the ace's HKB to take ace
+    if (!bda || bda.type !== 'H' || bdaHKB < aceHKB * 1.5) return {
+      player:aces[0], tag:'ACE SP', color:'var(--purple)',
+      reason:`No ace yet. ${aces[0].name}${aces[0].pitchPlus?` (Pitch+ ${aces[0].pitchPlus})`:''}. Elite SPs disappear fast — take now.`,
+    };
+    // Otherwise fall through to BDA — franchise hitter takes priority
+  }
+
+  // ── PRIORITY 3: BDA value check — franchise players override closer
+  // Key rule: NEVER recommend a closer over a player with 2× its HKB.
+  // Clay Holmes (1.7k) should never beat Roman Anthony (6.3k).
+  // Closer hunting starts only when BDA value drops to closer range.
+  const bdaHKB   = bda?.hkb || 0;
+  const bestCL   = !rpFull ? eliteRP[0] : null;
+  const clHKB    = bestCL?.hkb || 0;
+  const valueMult = STATE.winNow ? 1.8 : 2.5; // win-now is less patient
+  const closerOverridden = bestCL && bdaHKB >= clHKB * valueMult;
+
+  // ── PRIORITY 3a: Elite closer — only if not overridden by BDA value
+  if (!rpFull && bestCL && round >= 5 && !closerOverridden) {
+    return {
+      player:bestCL, tag:`CLOSER #${rpCount+1}`, color:'var(--green)',
+      reason:`${rpCount}/${C.CLOSER_TOTAL} closers filled. ${bestCL.name}: ${bestCL.stat5} SVH · ${bestCL.stat2?.toFixed(2)} ERA · ${bestCL.stat3?.toFixed(3)} WHIP. BDA (${fmtK(bdaHKB)}) is close enough in value.`,
+    };
+  }
+
+  // ── PRIORITY 4: BDA — sorted by mode ──────────────────────────────
+  // DYNASTY mode:  sort by DYN Z (age-weighted model — values youth)
+  // WIN-NOW mode:  sort by HKB  (market value — values contributors)
+  // This is what the toggle actually changes.
+  if (bda) {
+    // Re-sort BDA pool by mode, allowing elite prospects (HKB ≥ 4k)
+    const sortedBDA = [...bdaPool]
+      .filter(p => !p.prosp || (p.hkb||0) >= ELITE_PROSP_HKB)
+      .sort((a,b) =>
+        STATE.winNow
+          ? (b.hkb||0)  - (a.hkb||0)    // win-now: market value
+          : (b.dynZ||0) - (a.dynZ||0)    // dynasty: age-weighted model
+      ).filter(p => p.type !== 'SP' || !spFull);
+
+    const pick = sortedBDA[0] || bda;
+    if (pick.type==='SP' && spFull) {
+      const nonSP = sortedBDA.find(p=>p.type!=='SP');
+      if (nonSP) return {
+        player:nonSP, tag:'BDA', color:'var(--accent)',
+        reason:`SP slots full. Next best: ${nonSP.name} · HKB ${fmtK(nonSP.hkb||0)} · Age ${nonSP.age}.`,
+      };
+    }
+
+    const modeNote = STATE.winNow
+      ? `WIN-NOW sort: HKB ${fmtK(pick.hkb||0)} (market value).`
+      : `DYNASTY sort: DYN Z ${fmtN(pick.dynZ,3)} (age-weighted).`;
+    const ageNote  = (pick.age||99)<=24 ? ` Age ${pick.age} — 8+ yr window.` : '';
+    const pitchNote= pick.pitchPlus ? ` Pitch+ ${pick.pitchPlus}.` : '';
+
+    // If a closer was overridden by this BDA, call it out
+    const deferNote = (closerOverridden && bestCL)
+      ? ` Deferring ${bestCL.name} (${fmtK(clHKB)}) — ${fmtK(bdaHKB)} is ${Math.round(bdaHKB/clHKB)}× more valuable.`
+      : '';
+
+    return {
+      player:pick, tag:'BDA', color:'var(--accent)',
+      reason:`${modeNote}${pitchNote}${ageNote}${deferNote}`,
+    };
+  }
+
+  // ── PRIORITY 5: Second SP ─────────────────────────────────────────
+  if (!hasSP2 && poolSP.length) return {
+    player:poolSP[0], tag:'SP DEPTH', color:'var(--purple)',
+    reason:`Only 1 SP. Need SP2 before closer hunting. ${poolSP[0].name} is best available.`,
+  };
+
+  // ── PRIORITY 6: Solid RP if no elites left ────────────────────────
+  if (!rpFull && solidRP.length && round >= 8) return {
+    player:solidRP[0], tag:`CLOSER #${rpCount+1}`, color:'var(--yellow)',
+    reason:`No elite closers left. ${solidRP[0].name}: ${solidRP[0].stat5} SVH — best available SV+H arm.`,
+  };
+
+  // ── PRIORITY 7: Prospect stash ────────────────────────────────────
+  if (myProsp.length < C.MAX_PROSPECTS && round >= C.PROSPECT_RD_MIN && !STATE.rosterSlots['NA']) {
+    const prosp = pool.filter(p=>p.prosp&&(p.age||99)<=C.PROSPECT_AGE_MAX)[0];
+    if (prosp) return {
+      player:prosp, tag:'NA STASH', color:'var(--purple)',
+      reason:`NA slot open. ${prosp.name} (age ${prosp.age}) — best prospect stash. 1 max.`,
+    };
+  }
+
+  // Fallback
+  return pool[0] ? {
+    player:pool[0], tag:'BPA', color:'var(--text-dim)',
+    reason:`Best available player on the board.`,
+  } : null;
+}
+function renderTakeCard() {
+  const card = document.getElementById('takeCard');
+  if (!card) return;
+  const myTurn = isMyPick(STATE.currentPick);
+  if (!myTurn || !STATE.players.length) {
+    card.classList.remove('visible');
+    return;
+  }
+  const rec = getTakeRecommendation();
+  if (!rec) { card.classList.remove('visible'); return; }
+
+  const p = rec.player;
+  const meta = document.getElementById('takeMeta');
+  const nameEl = document.getElementById('takePlayerName');
+  const reasonEl = document.getElementById('takeReason');
+  const btn = document.getElementById('takeBtn');
+
+  if (meta) meta.innerHTML = `
+    ${posPill(p.pos)}
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;padding:2px 8px;
+      border-radius:10px;background:rgba(0,0,0,0.3);border:1px solid ${rec.color};
+      color:${rec.color};font-weight:600">${rec.tag}</span>
+    ${p.team ? `<span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--text-muted)">${p.team}</span>` : ''}
+    ${p.age ? `<span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--text-muted)">age ${p.age}</span>` : ''}
+    ${p.hkb ? `<span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--purple);font-weight:600">HKB ${fmtK(p.hkb)}</span>` : ''}
+  `;
+  if (nameEl) { nameEl.textContent = p.name; nameEl.style.color = rec.color; }
+  if (reasonEl) reasonEl.textContent = rec.reason;
+  if (btn) btn.dataset.playerName = p.name;
+  card.classList.add('visible');
+}
+
+function executeTake() {
+  const btn = document.getElementById('takeBtn');
+  if (!btn || !btn.dataset.playerName) return;
+  const name = btn.dataset.playerName;
+  if (STATE.players.find(p=>p.name===name)) {
+    draftPlayer(name);
+    // Scroll to the drafted player row briefly
+    const row = document.getElementById('row-' + name.replace(/[^a-z0-9]/gi,'_'));
+    if (row) row.scrollIntoView({ behavior:'smooth', block:'center' });
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// WIN-NOW TOGGLE
+// ════════════════════════════════════════════════════════════════════
+function setWinNowMode(winNow) {
+  STATE.winNow = winNow;
+  const btn0 = document.getElementById('modeBtn0');
+  const btn1 = document.getElementById('modeBtn1');
+  const desc = document.getElementById('modeDesc');
+  if (btn0 && btn1) {
+    btn0.style.background = winNow ? 'transparent' : 'var(--accent)';
+    btn0.style.color       = winNow ? 'var(--text-muted)' : '#000';
+    btn1.style.background  = winNow ? 'var(--gold)' : 'transparent';
+    btn1.style.color       = winNow ? '#000' : 'var(--text-muted)';
+  }
+  if (desc) desc.textContent = winNow
+    ? 'BDA sorted by HKB — proven contributors, age ≤32 preferred'
+    : 'BDA sorted by DYN Z — age-weighted model, youth prioritized';
+  // Re-render everything — toggle changes TAKE card recommendation
+  renderTakeCard();
+  renderAdviceBar();
+  renderPlayerTable(); // resorting may change visible rankings
+}
+
+// ════════════════════════════════════════════════════════════════════
+// WAR ROOM ADVICE ENGINE — Round-aware + win-now balance
+// ════════════════════════════════════════════════════════════════════
+function getWarRoomAdvice() {
+  const my = STATE.myDrafted;
+  const round = getRound();
+  const winNow = STATE.winNow;
+  const avail = p => !STATE.drafted.has(p.name);
+  const advices = [];
+
+  // ── Roster inventory ─────────────────────────────────────────────
+  const sps       = my.filter(p => p.type === 'SP');
+  const rps       = my.filter(p => p.type === 'RP');
+  const hitters   = my.filter(p => p.type === 'H');
+  const prospects = my.filter(p => p.prosp);
+  const hasAce    = sps.some(p => (p.hkb||0) >= 4500 || (p.dynZ||0) > 0.6);
+  const closers   = rps.filter(p => (p.stat5||0) >= 30);
+  const hasC      = my.some(p => p.pos === 'C');
+  const has1B     = my.some(p => p.pos === '1B' || p.pos.startsWith('1B/'));
+  const has2B     = my.some(p => p.pos === '2B' || p.pos.startsWith('2B/') || p.pos.includes('/2B'));
+  const has3B     = my.some(p => p.pos === '3B' || p.pos.startsWith('3B/') || p.pos.includes('/3B'));
+  const hasSS     = my.some(p => p.pos === 'SS' || p.pos.startsWith('SS/') || p.pos.includes('/SS'));
+  const ofCount   = my.filter(p => p.pos === 'OF' || p.pos.startsWith('OF/')).length;
+  const hasProsp  = prospects.length > 0;
+  const avgAge    = my.length ? my.reduce((s,p) => s+(p.age||27),0)/my.length : 0;
+
+  // Win-now: care about immediate contributors (age ≤32, hkb ≥1500)
+  const isContributor = p => (p.age||99) <= 32 && (p.hkb||0) >= 1500 && !p.prosp;
+
+  // Non-prospect hitter filter — never suggest a prospect to fill a starting slot
+  const noPros = p => !p.prosp && (p.hkb||0) >= 500;
+
+  // ── Available pools ───────────────────────────────────────────────
+  const C = CONSTITUTION;
+  const A = {
+    sp:       STATE.players.filter(p => p.type==='SP' && avail(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
+    // Closers in advice bar use same quality gates as TAKE engine
+    rp:       STATE.players.filter(p => p.type==='RP' && avail(p)
+                && (p.stat5||0)>=C.CLOSER_SVH_MIN
+                && (p.stat2||99)<=C.CLOSER_ERA_MAX
+                && (p.stat3||99)<=C.CLOSER_WHIP_MAX).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
+    hitter:   STATE.players.filter(p => p.type==='H' && avail(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
+    youngH:   STATE.players.filter(p => p.type==='H' && avail(p) && (p.age||99)<=28 && noPros(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
+    eliteH:   STATE.players.filter(p => p.type==='H' && avail(p) && (p.hkb||0)>=4000 && noPros(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
+    contrib:  STATE.players.filter(p => avail(p) && isContributor(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
+    // Positional gap pools — prospects excluded, must have real HKB
+    c1B:      STATE.players.filter(p => (p.pos==='1B'||p.pos.startsWith('1B/')) && avail(p) && noPros(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
+    c2B:      STATE.players.filter(p => (p.pos==='2B'||p.pos.startsWith('2B/')||p.pos.includes('/2B')) && avail(p) && noPros(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
+    c3B:      STATE.players.filter(p => (p.pos==='3B'||p.pos.startsWith('3B/')||p.pos.includes('/3B')) && avail(p) && noPros(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
+    catcher:  STATE.players.filter(p => p.pos==='C' && avail(p) && noPros(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
+    ss:       STATE.players.filter(p => (p.pos==='SS'||p.pos.startsWith('SS/')||p.pos.includes('/SS')) && avail(p) && noPros(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
+    of:       STATE.players.filter(p => (p.pos==='OF'||p.pos.startsWith('OF/')) && avail(p) && noPros(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
+    youngSP:  STATE.players.filter(p => p.type==='SP' && avail(p) && (p.age||99)<=27).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
+    prosp:    STATE.players.filter(p => p.prosp && avail(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
+    youngAll: STATE.players.filter(p => avail(p) && (p.age||99)<=23 && noPros(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
+  };
+
+  const nm  = p => p ? `${p.name} (${p.age}, ${p.pos})` : '—';
+  const hk  = p => p && p.hkb ? ` · HKB ${fmtK(p.hkb)}` : '';
+
+  // ══════════════════════════════════════════════════════════════════
+  // POSITIONAL COMPLETENESS — uses round-based thresholds
+  // ══════════════════════════════════════════════════════════════════
+  const gaps = getPosGaps();
+  const forceGap = gaps.find(g => g.urgency === 'force');
+  const warnGap  = gaps.find(g => g.urgency === 'warn');
+  const gapThreshold = winNow ? 'warn' : 'force'; // win-now warns earlier
+
+  const activeGap = winNow ? (forceGap || warnGap) : forceGap;
+  if (activeGap) {
+    const urgency = activeGap.urgency === 'force' ? 'var(--red)' : 'var(--orange)';
+    const icon    = activeGap.urgency === 'force' ? '🚨' : '⚠️';
+    advices.push({ color: urgency, icon,
+      msg: `${activeGap.urgency==='force'?'MUST-FILL':'SOON'}: NO ${activeGap.pos} — ${nm(activeGap.best)}${hk(activeGap.best)}` });
+    const secondGap = gaps.find(g => g !== activeGap);
+    if (secondGap) advices.push({ color:'var(--orange)', icon:'⚠️',
+      msg:`Also no ${secondGap.pos} — ${nm(secondGap.best)}${hk(secondGap.best)}` });
+    return advices.slice(0,2);
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // ROUND 1 — Elite youth first. Never reach for aging SP.
+  // ══════════════════════════════════════════════════════════════════
+  if (round === 1) {
+    if (A.eliteH.length) {
+      const topH = A.eliteH[0];
+      const topSP = A.sp[0];
+      if (topSP && (topSP.age||0) >= 29 && (topH.age||0) <= 28 && (topH.hkb||0) >= (topSP.hkb||0) * 0.8) {
+        advices.push({ color:'var(--red)', icon:'🚨',
+          msg:`R1 RULE — Take ${nm(topH)}${hk(topH)} over ${topSP.name} (age ${topSP.age}). Never reach for aging SP in R1.` });
+      } else {
+        advices.push({ color:'var(--accent)', icon:'🎯',
+          msg:`R1 BPA — Best available: ${nm(topH)}${hk(topH)}. Target age ≤28 with 6+ year window.` });
+      }
+    }
+    if (A.ss.length && (A.ss[0].hkb||0) >= 4000) {
+      advices.push({ color:'var(--blue)', icon:'⚡',
+        msg:`ELITE SS AVAILABLE — ${nm(A.ss[0])}${hk(A.ss[0])} — franchise-level asset, premium position.` });
+    }
+    return advices.slice(0,2);
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // ROUNDS 2–3
+  // ══════════════════════════════════════════════════════════════════
+  if (round <= 3) {
+    if (!hasSS && A.ss.length)
+      advices.push({ color:'var(--red)', icon:'🚨',
+        msg:`SS SCARCITY — Thinnest position in dynasty. Take ${nm(A.ss[0])}${hk(A.ss[0])} now or miss out.` });
+    if (winNow && !has1B && A.c1B.length)
+      advices.push({ color:'var(--orange)', icon:'⚠️',
+        msg:`1B GAP — Win-now mode: ${nm(A.c1B[0])}${hk(A.c1B[0])} contributes immediately.` });
+    if (!advices.length && A.youngH.length)
+      advices.push({ color:'var(--accent)', icon:'🎯',
+        msg:`R2-3 BPA — ${nm(A.youngH[0])}${hk(A.youngH[0])}. Stack elite youth now.` });
+    return advices.slice(0,2);
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // ROUNDS 4–6
+  // ══════════════════════════════════════════════════════════════════
+  if (round <= 6) {
+    if (!has1B && A.c1B.length)
+      advices.push({ color:'var(--red)', icon:'🚨',
+        msg:`NO 1B — Empty starting slot costs you every week. Take ${nm(A.c1B[0])}${hk(A.c1B[0])}.` });
+    if (!hasAce && A.sp.length)
+      advices.push({ color:'var(--red)', icon:'🚨',
+        msg:`SECURE AN ACE — No elite SP yet. ${nm(A.sp[0])}${hk(A.sp[0])}.` });
+    if (winNow && A.contrib.length && !advices.length)
+      advices.push({ color:'var(--gold)', icon:'🏆',
+        msg:`WIN-NOW BPA — ${nm(A.contrib[0])}${hk(A.contrib[0])} — immediate contributor, proven production.` });
+    if (!advices.length && A.youngH.length)
+      advices.push({ color:'var(--accent)', icon:'🎯',
+        msg:`R4-6 BPA — ${nm(A.youngH[0])}${hk(A.youngH[0])}.` });
+    return advices.slice(0,2);
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // ROUNDS 7–10 — Closer window, fill gaps
+  // ══════════════════════════════════════════════════════════════════
+  if (round <= 10) {
+    const closersNeeded = Math.max(0, 6 - closers.length);
+    if (!has1B && A.c1B.length)
+      advices.push({ color:'var(--red)', icon:'🚨',
+        msg:`NO 1B — Critical gap. ${nm(A.c1B[0])}${hk(A.c1B[0])}. Empty slot = free losses every week.` });
+    else if (closersNeeded >= 4 && A.rp.length)
+      advices.push({ color:'var(--red)', icon:'🚨',
+        msg:`SV+H EMERGENCY — Only ${closers.length}/6 closers. Take ${nm(A.rp[0])} · ${A.rp[0].stat5} SVH.` });
+    else if (closersNeeded >= 2 && A.rp.length)
+      advices.push({ color:'var(--green)', icon:'🔒',
+        msg:`CLOSER WINDOW — Need ${closersNeeded} more SV+H arm${closersNeeded>1?'s':''}. ${nm(A.rp[0])} · ${A.rp[0].stat5} SVH.` });
+    if (winNow && A.contrib.length && advices.length < 2)
+      advices.push({ color:'var(--gold)', icon:'🏆',
+        msg:`WIN-NOW DEPTH — ${nm(A.contrib[0])}${hk(A.contrib[0])} — contributes in 2026 while you build.` });
+    else if (!hasC && A.catcher.length)
+      advices.push({ color:'var(--red)', icon:'🚨',
+        msg:`NO CATCHER — ${nm(A.catcher[0])}${hk(A.catcher[0])}.` });
+    if (!advices.length)
+      advices.push({ color:'var(--accent)', icon:'🎯',
+        msg:`R7-10 BPA — ${nm(A.hitter[0]||A.sp[0])}${hk(A.hitter[0]||A.sp[0])}.` });
+    return advices.slice(0,2);
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // ROUNDS 11–15 — Depth + upside + prospect stash
+  // ══════════════════════════════════════════════════════════════════
+  if (round <= 15) {
+    const closersNeeded = Math.max(0, 6 - closers.length);
+    // Fill any remaining positional gaps first
+    if (!has1B && A.c1B.length)
+      advices.push({ color:'var(--red)', icon:'🚨',
+        msg:`STILL NO 1B — ${nm(A.c1B[0])}${hk(A.c1B[0])}. This is costing you categories every week.` });
+    else if (closersNeeded > 0 && A.rp.length)
+      advices.push({ color:'var(--green)', icon:'🔒',
+        msg:`SV+H DEPTH — ${closersNeeded} closer slot${closersNeeded>1?'s':''} open. ${nm(A.rp[0])} · ${A.rp[0].stat5} SVH.` });
+    if (!hasProsp && A.prosp.length)
+      advices.push({ color:'var(--purple)', icon:'★',
+        msg:`STASH A PROSPECT — NA slot empty. ${nm(A.prosp[0])}${hk(A.prosp[0])} — dynasty upside.` });
+    if (winNow && advices.length < 2 && A.contrib.length)
+      advices.push({ color:'var(--gold)', icon:'🏆',
+        msg:`WIN-NOW PICK — ${nm(A.contrib[0])}${hk(A.contrib[0])} — quality depth, contributes in 2026.` });
+    if (!advices.length) {
+      const youngKArm = A.sp.find(p => (p.age||99)<=26 && (p.stat1||0)>=140);
+      if (youngKArm)
+        advices.push({ color:'var(--purple)', icon:'💪',
+          msg:`YOUNG K-ARM — ${nm(youngKArm)}${hk(youngKArm)} · ${youngKArm.stat1}K proj. Dynasty SP upside.` });
+      else
+        advices.push({ color:'var(--accent)', icon:'🎯',
+          msg:`R11-15 — ${nm(A.youngAll[0]||A.hitter[0])}. Favor age ≤25 in these rounds.` });
+    }
+    return advices.slice(0,2);
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // ROUNDS 16–23 — Lottery. Age ≤23 only. No old vets.
+  // ══════════════════════════════════════════════════════════════════
+  if (round <= 23) {
+    const closersNeeded = Math.max(0, 6 - closers.length);
+    if (!has1B && A.c1B.length)
+      advices.push({ color:'var(--red)', icon:'🚨',
+        msg:`STILL NO 1B — Last chance. ${nm(A.c1B[0])}${hk(A.c1B[0])}.` });
+    if (closersNeeded > 0 && A.rp.length)
+      advices.push({ color:'var(--green)', icon:'🔒',
+        msg:`HANDCUFF CLOSER — ${nm(A.rp[0])} · ${A.rp[0].stat5} SVH. Young arm with save upside.` });
+    if (!hasProsp && A.prosp.length)
+      advices.push({ color:'var(--purple)', icon:'★',
+        msg:`LAST CALL: STASH — ${nm(A.prosp[0])}${hk(A.prosp[0])} for NA slot. Pure dynasty upside.` });
+    const lotteryArm = A.sp.find(p => (p.age||99)<=24);
+    const lotteryBat = A.hitter.find(p => (p.age||99)<=23);
+    const pick = lotteryBat || lotteryArm;
+    if (!advices.length && pick)
+      advices.push({ color:'var(--blue)', icon:'🎰',
+        msg:`LOTTERY — ${nm(pick)}${hk(pick)}. Age ≤24 only. Swing for upside.` });
+    if (!advices.length)
+      advices.push({ color:'var(--text-muted)', icon:'🎰',
+        msg:`R${round} DART THROW — Age ≤24 only. Zero value in 33+ vets.` });
+    return advices.slice(0,2);
+  }
+
+  return [{ color:'var(--accent)', icon:'✅', msg:'Draft complete! Head to My Roster to review.' }];
+}
+
+function renderAdviceBar() {
+  const bar = document.getElementById('adviceBar');
+  if (!bar) return;
+  if (!STATE.players.length) { bar.innerHTML = ''; return; }
+
+  // When it's your pick, TAKE card is the single source of truth.
+  // Suppress the advice bar to eliminate conflicting signals.
+  if (isMyPick(STATE.currentPick)) {
+    bar.innerHTML = '';
+    return;
+  }
+
+  const advices = getWarRoomAdvice();
+  bar.innerHTML = advices.map(a =>
+    `<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--surface2);
+      border-radius:8px;border:1px solid rgba(46,46,74,0.6);border-left:3px solid ${a.color};flex:1;min-width:0">
+      <span style="font-size:18px;flex-shrink:0">${a.icon}</span>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:${a.color};
+        font-weight:600;letter-spacing:0.3px;line-height:1.4">${a.msg}</span>
+    </div>`
+  ).join('');
+}
+
+
+
+// ════════════════════════════════════════════════════════════════════
+function setWaiverFilter(f, btn) {
+  STATE.waiverFilter = f;
+  document.querySelectorAll('#tab-waivers .filter-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  renderWaiverTable();
+}
+
+function renderWaivers() {
+  document.getElementById('waiverPlaceholder').style.display = 'none';
+  document.getElementById('waiverContent').style.display = 'block';
+  renderWaiverTable();
+}
+
+function renderWaiverTable() {
+  const tbody = document.getElementById('waiverTbody');
+  if (!tbody) return;
+  let avail = STATE.players.filter(p => !STATE.drafted.has(p.name));
+  if (STATE.waiverFilter !== 'ALL') avail = avail.filter(p => p.type === STATE.waiverFilter);
+  avail.sort((a, b) => (b.dynZ || -99) - (a.dynZ || -99));
+
+  tbody.innerHTML = avail.slice(0, 150).map(p => {
+    const delta = p.hkb > 0 ? Math.round(p.delta) : null;
+    return `<tr>
+      <td class="mono" style="font-size:10px;color:var(--text-muted)">${p.ovrRk||'—'}</td>
+      <td style="font-weight:500;font-size:12px">${p.name} ${p.prosp?'<span class="badge badge-prosp">PROSP</span>':''}</td>
+      <td>${posPill(p.pos)}</td>
+      <td class="mono" style="font-size:11px">${p.age||'—'}</td>
+      <td class="mono" style="font-size:10px;color:var(--text-dim)">${p.team||'—'}</td>
+      <td class="mono" style="font-size:9px;color:var(--text-muted);white-space:nowrap">${statLine(p)}</td>
+      <td class="mono" style="font-size:11px;color:var(--green);font-weight:600">${p.dynZ!==null?fmtN(p.dynZ,3):'—'}</td>
+      <td class="mono" style="font-size:11px;color:var(--purple)">${p.hkb>0?fmtK(p.hkb):'—'}</td>
+      <td class="mono ${delta!==null?deltaClass(delta):''}" style="font-size:10px">${delta!==null?deltaLabel(delta):'—'}</td>
+      <td style="font-size:9px;color:var(--text-muted);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.notes||''}</td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="10" style="text-align:center;padding:24px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;font-size:11px">All players drafted</td></tr>`;
+}
+
+// ════════════════════════════════════════════════════════════════════
+// TRADE ANALYZER
+// ════════════════════════════════════════════════════════════════════
+function tradeAC(side, query) {
+  const acId = side === 'give' ? 'tradeGiveAC' : 'tradeGetAC';
+  const ac = document.getElementById(acId);
+  if (!ac) return;
+  if (!query || query.length < 2) { ac.style.display = 'none'; return; }
+  const q = query.toLowerCase();
+  const matches = STATE.players.filter(p => p.name.toLowerCase().includes(q)).slice(0, 8);
+  if (!matches.length) { ac.style.display = 'none'; return; }
+  ac.innerHTML = matches.map(p =>
+    `<div class="ac-item" onclick="tradeAdd('${side}','${esc(p.name)}')">
+      <span>${p.name}</span>
+      <span class="mono" style="font-size:9px;gap:6px;display:flex;align-items:center">
+        ${posPill(p.pos)}
+        <span style="color:var(--green)">DZ:${p.dynZ!==null?fmtN(p.dynZ,2):'—'}</span>
+        <span style="color:var(--purple)">HKB:${p.hkb?fmtK(p.hkb):'—'}</span>
+      </span>
+    </div>`
+  ).join('');
+  ac.style.display = 'block';
+}
+
+function tradeAdd(side, name) {
+  const list = side === 'give' ? STATE.tradeGive : STATE.tradeGet;
+  if (!list.includes(name)) list.push(name);
+  const acId = side === 'give' ? 'tradeGiveAC' : 'tradeGetAC';
+  const searchId = side === 'give' ? 'tradeGiveSearch' : 'tradeGetSearch';
+  const ac = document.getElementById(acId);
+  const inp = document.getElementById(searchId);
+  if (ac) ac.style.display = 'none';
+  if (inp) inp.value = '';
+  renderTradeAnalyzer();
+}
+
+function tradeRemove(side, name) {
+  if (side === 'give') STATE.tradeGive = STATE.tradeGive.filter(n => n !== name);
+  else STATE.tradeGet = STATE.tradeGet.filter(n => n !== name);
+  renderTradeAnalyzer();
+}
+
+function renderTradeAnalyzer() {
+  const renderSide = (side, names, listId, dynId, hkbId) => {
+    const listEl = document.getElementById(listId);
+    let dynTotal = 0, hkbTotal = 0;
+    if (listEl) {
+      listEl.innerHTML = names.map(name => {
+        const p = STATE.players.find(x => x.name === name);
+        if (!p) return '';
+        dynTotal += p.dynZ || 0;
+        hkbTotal += p.hkb || 0;
+        const delta = p.hkb > 0 ? Math.round(p.delta) : null;
+        return `<div class="trade-asset">
+          <span style="flex:1;font-weight:500;font-size:11px">${p.name}</span>
+          ${posPill(p.pos)}
+          <span class="mono" style="font-size:9px;color:var(--green)">${fmtN(p.dynZ,2)}</span>
+          <span class="mono" style="font-size:9px;color:var(--purple)">${p.hkb?fmtK(p.hkb):'—'}</span>
+          ${delta !== null ? `<span class="mono ${deltaClass(delta)}" style="font-size:9px">${deltaLabel(delta)}</span>` : ''}
+          <button class="remove-x" onclick="tradeRemove('${side}','${esc(name)}')">×</button>
+        </div>`;
+      }).join('') || '<div class="mono muted" style="font-size:11px;padding:8px">Add players above</div>';
+    }
+    const de = document.getElementById(dynId);
+    const he = document.getElementById(hkbId);
+    if (de) de.textContent = fmtN(dynTotal, 3);
+    if (he) he.textContent = fmtK(Math.round(hkbTotal));
+    return { dynTotal, hkbTotal };
+  };
+
+  const give = renderSide('give', STATE.tradeGive, 'tradeGiveList', 'giveScoreDynZ', 'giveScoreHKB');
+  const get  = renderSide('get',  STATE.tradeGet,  'tradeGetList',  'getScoreDynZ',  'getScoreHKB');
+
+  const verdict = document.getElementById('tradeVerdictEl');
+  if (!verdict) return;
+
+  if (!STATE.tradeGive.length || !STATE.tradeGet.length) {
+    verdict.innerHTML = '<div class="mono muted" style="font-size:12px">Add players to both sides to analyze</div>';
+    return;
+  }
+
+  const dynDiff = get.dynTotal - give.dynTotal;
+  const hkbDiff = get.hkbTotal - give.hkbTotal;
+  const dynPct  = give.dynTotal ? Math.abs(dynDiff / give.dynTotal) * 100 : 0;
+  const bothAgree = (dynDiff > 0 && hkbDiff > 0) || (dynDiff < 0 && hkbDiff < 0);
+
+  let color, label, sub;
+  if (Math.abs(dynDiff) < 0.05 && Math.abs(hkbDiff) < 200) {
+    color = 'var(--text-dim)'; label = 'FAIR TRADE';
+    sub = 'Both DYN Z and HKB show equal value';
+  } else if (dynDiff > 0) {
+    color = 'var(--green)';
+    label = dynPct > 25 ? '🏆 YOU WIN BIG' : '✅ YOU WIN';
+    const extra = !bothAgree ? ' · ⚠️ HKB disagrees — market favors the other side' : '';
+    sub = `+${fmtN(dynDiff,3)} DYN Z (${dynPct.toFixed(0)}% edge)${extra}`;
+  } else {
+    color = 'var(--red)';
+    label = dynPct > 25 ? '❌ AVOID THIS TRADE' : '⚠️ YOU LOSE';
+    const extra = !bothAgree ? ' · ℹ️ HKB disagrees — market favors you, but our model says no' : '';
+    sub = `${fmtN(dynDiff,3)} DYN Z (${dynPct.toFixed(0)}% disadvantage)${extra}`;
+  }
+
+  verdict.innerHTML = `
+    <div class="verdict-big" style="color:${color}">${label}</div>
+    <div class="mono" style="font-size:11px;color:var(--text-dim);margin-top:8px">${sub}</div>
+    <div style="display:flex;justify-content:center;gap:40px;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
+      <div style="text-align:center">
+        <div class="mono" style="font-size:9px;color:var(--text-muted);margin-bottom:2px">GIVE · DYN Z</div>
+        <div class="mono" style="font-size:22px;color:var(--red)">${fmtN(give.dynTotal,3)}</div>
+        <div class="mono" style="font-size:9px;color:var(--purple)">HKB ${fmtK(Math.round(give.hkbTotal))}</div>
+      </div>
+      <div style="align-self:center;font-size:28px;color:var(--text-muted)">⇄</div>
+      <div style="text-align:center">
+        <div class="mono" style="font-size:9px;color:var(--text-muted);margin-bottom:2px">GET · DYN Z</div>
+        <div class="mono" style="font-size:22px;color:${dynDiff>=0?'var(--green)':'var(--red)'}">${fmtN(get.dynTotal,3)}</div>
+        <div class="mono" style="font-size:9px;color:var(--purple)">HKB ${fmtK(Math.round(get.hkbTotal))}</div>
+      </div>
+    </div>`;
+}
+
+// ════════════════════════════════════════════════════════════════════
+// UI HELPERS
+// ════════════════════════════════════════════════════════════════════
+function setTab(tab) {
+  STATE.activeTab = tab;
+  document.querySelectorAll('.nav-tab').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === tab);
+  });
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  const el = document.getElementById('tab-' + tab);
+  if (el) el.classList.add('active');
+  if (tab === 'my-roster')     renderMyRoster();
+  if (tab === 'trade-analyzer') renderTradeAnalyzer();
+}
+
+function setFilter(f, btn) {
+  STATE.filter = f;
+  document.querySelectorAll('#filterBtns .filter-btn:not(.warn):not([onclick*="advancePick"]):not([onclick*="hideDrafted"])').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  renderPlayerTable();
+}
+
+function setSearch(s) {
+  STATE.search = s;
+  renderPlayerTable();
+}
+
+function setSort(col) {
+  if (STATE.sortCol === col) STATE.sortDir *= -1;
+  else { STATE.sortCol = col; STATE.sortDir = 1; }
+  document.querySelectorAll('.data-table th[data-col]').forEach(th => {
+    const active = th.dataset.col === col;
+    th.classList.toggle('sorted', active);
+    th.dataset.dir = active ? (STATE.sortDir > 0 ? '↑' : '↓') : '';
+  });
+  renderPlayerTable();
+}
+
+function setProgress(pct, msg) {
+  const bar = document.getElementById('loadBar');
+  const status = document.getElementById('loadStatus');
+  if (bar)    bar.style.width = pct + '%';
+  if (status) status.textContent = msg;
+}
+
+function renderAll() {
+  renderPlayerTable();
+  renderPickPanel();
+  renderAdviceBar();
+  renderTakeCard();
+  if (STATE.activeTab === 'my-roster')      renderMyRoster();
+  if (STATE.activeTab === 'trade-analyzer') renderTradeAnalyzer();
+}
+
+// Close autocomplete on outside click
+document.addEventListener('click', e => {
+  if (!e.target.closest('.trade-input-wrap')) {
+    document.querySelectorAll('.autocomplete-drop').forEach(el => el.style.display = 'none');
+  }
+});
+
+// ════════════════════════════════════════════════════════════════════
+// SYNC
+// ════════════════════════════════════════════════════════════════════
+async function syncData() {
+  const btn = document.getElementById('syncBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '⟳ SYNCING...'; }
+  await fetchPlayers();
+  restoreMyDrafted();
+  renderAll();
+  if (btn) { btn.disabled = false; btn.textContent = '⟳ SYNC'; }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════════════════════════════════
+function dismissOverlay() {
+  const overlay = document.getElementById('loading-overlay');
+  if (!overlay || overlay.style.display === 'none') return;
+  overlay.style.transition = 'opacity 0.4s';
+  overlay.style.opacity = '0';
+  setTimeout(() => { overlay.style.display = 'none'; }, 420);
+}
+
+async function init() {
+  // Hard safety timeout — ALWAYS dismiss after 12s no matter what
+  const safetyTimer = setTimeout(() => {
+    console.warn('Safety timeout hit — forcing overlay dismiss');
+    setProgress(100, 'READY (timeout fallback)');
+    dismissOverlay();
+  }, 12000);
+
+  try {
+    setProgress(5, 'LOADING WAR ROOM...');
+    loadState();
+    setProgress(15, 'CONNECTING TO GOOGLE SHEETS...');
+    await fetchPlayers();
+    setProgress(80, 'RESTORING DRAFT STATE...');
+    restoreMyDrafted();
+    setProgress(95, 'RENDERING...');
+    try { renderAll(); } catch(re) { console.error('renderAll error:', re); }
+    setProgress(100, 'READY');
+  } catch (e) {
+    console.error('Init error:', e);
+    setProgress(100, 'ERROR — see console. App may still work.');
+  } finally {
+    clearTimeout(safetyTimer);
+    setTimeout(dismissOverlay, 500);
+  }
+}
+
+window.addEventListener('load', init);
+</script>
+</body>
+</html>
