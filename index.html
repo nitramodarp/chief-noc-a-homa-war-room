@@ -417,14 +417,16 @@
               <thead>
                 <tr>
                   <th onclick="setSort('ovrRk')" data-col="ovrRk" title="Overall Dynasty Rank">RK</th>
-                  <th onclick="setSort('name')" data-col="name" style="min-width:150px">NAME</th>
+                  <th onclick="setSort('name')" data-col="name" style="min-width:160px">NAME</th>
                   <th onclick="setSort('age')" data-col="age" title="Age">AGE</th>
                   <th>TEAM</th>
                   <th title="Type: H=Hitter, SP=Starter, RP=Reliever">TYPE</th>
                   <th title="Key projected stats">STAT LINE</th>
+                  <th onclick="setSort('pitchPlus')" data-col="pitchPlus" title="Eno Sarris Pitching+ — pitchers only. 100=average, 115+=elite. Combines Stuff+ and Location+.">PITCH+</th>
+                  <th title="Stuff+ / Location+ / Health — Eno Sarris pitch report. Hover player name for full scouting note." style="min-width:110px">S+ · L+ · HLTH</th>
                   <th onclick="setSort('dynZ')" data-col="dynZ" title="Our model: z-score × age multiplier (your league's categories)">DYN Z</th>
                   <th onclick="setSort('hkb')" data-col="hkb" title="HarryKnowsBall crowdsourced dynasty market value">HKB</th>
-                  <th onclick="setSort('delta')" data-col="delta" title="Delta = HKB rank − DYN Z rank. Positive = undervalued by market (BUY). Negative = overvalued (SELL).">DELTA</th>
+                  <th onclick="setSort('delta')" data-col="delta" title="Delta: positive = market undervaluing vs our model = BUY. Negative = market overvaluing = SELL.">DELTA</th>
                   <th>NOTES</th>
                   <th style="min-width:62px"></th>
                 </tr>
@@ -454,6 +456,12 @@
             <div class="stat-val" id="sc-round" style="color:var(--gold)">1</div>
             <div class="stat-lbl">Round</div>
           </div>
+        </div>
+
+        <!-- PICKS UNTIL YOUR TURN -->
+        <div id="countdownCard" class="panel" style="padding:12px;margin-bottom:0;text-align:center">
+          <div id="countdownNum" style="font-family:'Bebas Neue',cursive;font-size:42px;letter-spacing:3px;line-height:1;color:var(--accent)">—</div>
+          <div id="countdownLbl" style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--text-muted);text-transform:uppercase;margin-top:3px">Picks Until Your Turn</div>
         </div>
 
         <div class="panel" style="padding:12px;margin-bottom:0">
@@ -695,7 +703,82 @@ const HKB_RAW = {
 };
 
 // ════════════════════════════════════════════════════════════════════
-// KNOWN PROSPECTS — whitelist overrides sheet PROSP column
+// ENO SARRIS PITCH REPORT 2026
+// Stuff+ / Location+ / Pitching+ / Health / ppERA / Blurb
+// Source: The Athletic / Eno Sarris, March 2026
+// ════════════════════════════════════════════════════════════════════
+const ENO_DATA = {
+  "tarik skubal":{r:1,s:123,l:101,p:123,h:"87%",ip:"180",era:"2.55",b:"What is there to say about this power lefty coming off two straight Cy Young seasons that everyone doesn't know by now? How about a quick discussion of his health risk, that wet blanket that hangs over all pitchers in the game today. It's true that Tarik Skubal has had some injuries in the past"},
+  "paul skenes":{r:2,s:110,l:111,p:120,h:"91%",ip:"183",era:"2.74",b:"When it comes to injury risk, Paul Skenes provides a fascinating foil to Tarik Skubal. His health bill has largely been clean so far, but he sits only 2 mph off his maximum fastball velocity. He still gets an A in the health department. Power, command and a wide arsenal: he's got everything."},
+  "garrett crochet":{r:3,s:117,l:100,p:114,h:"85%",ip:"181",era:"2.90",b:"With a top-10 fastball in the league and the best cutter thrown by a starter (both by Stuff+), Garrett Crochet has an excellent foundation. He diversified in 2025 — more sinkers and sliders made him a four-pitch power dude with command."},
+  "cristopher sanchez":{r:4,s:117,l:99,p:116,h:"94%",ip:"186",era:"3.09",b:"After throwing harder (95+ on the fastball, 85+ on the slider), his stuff and strikeout numbers surged and he looks like an ace. High-end No. 2 starter floor at minimum. Best health grade of any ace-tier arm."},
+  "yoshinobu yamamoto":{r:5,s:100,l:107,p:110,h:"85%",ip:"169",era:"3.22",b:"Stuff+ is merely above-average for a starter of his caliber, but he excels at Location+. A statistic like Stuff+ matters most in the first five starts — after that, results fold in too. He has been elite."},
+  "hunter brown":{r:6,s:105,l:97,p:103,h:"93%",ip:"187",era:"3.36",b:"Ever since he added a sinker, Hunter Brown has been an ace. Top 15 in innings and strikeouts over two seasons with a 2.94 ERA. Best health grade of any high-end starter. Small orange flag from strikeout rate dip in second half."},
+  "max fried":{r:7,s:109,l:103,p:113,h:"87%",ip:"170",era:"3.32",b:"A completely new sinker, his slider and sweeper separated further into two better pitches, career-best numbers. He looks like a legitimate top-10 starter, and the Yankees give him wins support."},
+  "logan gilbert":{r:8,s:104,l:102,p:108,h:"88%",ip:"153",era:"3.05",b:"Forearm tightness cost him time. Around that injury, Gilbert looked as good as ever — best strikeout rate of his career. Now a splitter guy, his awesome extension makes it hard on hitters. Health is the only concern."},
+  "bryan woo":{r:9,s:109,l:105,p:112,h:"87%",ip:"162",era:"3.14",b:"This health grade seems a little rosy — doesn't include his college Tommy John surgery. He ran out of gas late last season and had a right forearm issue. The stuff is elite when healthy."},
+  "chris sale":{r:10,s:116,l:102,p:113,h:"63%",ip:"144",era:"3.02",b:"Still an ace, but also 37. A fractured ribcage on an acrobatic play derailed 2025. When he pitches he's elite — the health grade is the entire story here."},
+  "george kirby":{r:11,s:99,l:111,p:109,h:"86%",ip:"162",era:"3.21",b:"Shoulder inflammation was a comparative blip. Among pitchers with Cy-worth upside and health risk, Kirby's soreness has been manageable. His elite Location+ is rare for a high-K pitcher."},
+  "logan webb":{r:12,s:106,l:105,p:110,h:"97%",ip:"191",era:"3.25",b:"A wider arsenal pushed the Giants ace to the best season of his career. Best health grade (97%) of any top-15 pitcher. He's the safest high-floor arm in the draft. Durability is a fantasy superpower."},
+  "framber valdez":{r:13,s:106,l:100,p:110,h:"90%",ip:"181",era:"3.52",b:"Statistically speaking, Framber Valdez has been a rock. Even his worst season was top 40 in fantasy because of ground balls and an above-average strikeout rate. Durable workhorse with elite health grade."},
+  "eury perez":{r:14,s:115,l:97,p:108,h:"65%",ip:"153",era:"3.59",b:"The promise is tantalizing — 98 mph fastball, 86 mph power slider. He had top-10 Stuff+ but the health grade is a major concern at 65%. If he stays healthy, he could make a Sanchez-type leap."},
+  "cole ragans":{r:16,s:112,l:101,p:111,h:"78%",ip:"132",era:"3.37",b:"After a couple elbow surgeries in the Rangers org, he broke free and became a stud. Finished 4th in AL Cy Young voting in 2024. Health flag is the main concern — only 78% and limited projected IP."},
+  "jacob degrom":{r:17,s:108,l:107,p:117,h:"53%",ip:"130",era:"3.41",b:"Coming off a season where he threw 170+ innings for first time since 2019, sitting in the high 90s again. Almost vintage. But 53% health grade is the worst of any top-20 ranked arm. Pure boom/bust."},
+  "freddy peralta":{r:18,s:99,l:108,p:106,h:"86%",ip:"170",era:"3.74",b:"Seventh-best fantasy SP last year. The year before he was 41st. He can be super valuable. The Location+ is where he excels — elite command of average stuff. Health grade solid at 86%."},
+  "shohei ohtani":{r:19,s:114,l:101,p:116,h:"66%",ip:"133",era:"3.08",b:"In certain fantasy leagues he is draftable separately as a pitcher. Career 3.00 ERA built on impeccable stuff. His elbow health is the key question. Eno projects 133 IP if he pitches — elite when he does."},
+  "joe ryan":{r:20,s:108,l:103,p:108,h:"88%",ip:"156",era:"3.62",b:"Unique arm slot and fastball shape, plus willingness to pitch up in the zone, makes him a high-strikeout No. 2 starter. Good health grade. Only 148 qualified starters have higher K rates since 2022."},
+  "tyler glasnow":{r:21,s:101,l:89,p:97,h:"61%",ip:"123",era:"3.39",b:"He lost velocity last season — nearly two full ticks on the curve. Location+ at 89 is the worst of any top-25 arm. Health grade of 61% makes him a boom/bust pick. Elite when healthy, rarely healthy."},
+  "dylan cease":{r:23,s:108,l:100,p:107,h:"90%",ip:"172",era:"3.55",b:"Sometimes underperforms his peripherals as a two-pitch pitcher, but the peripherals are often top of the league. Excellent health grade at 90%. The ride can be bumpy but the ceiling is real."},
+  "jacob misiorowski":{r:24,s:116,l:103,p:119,h:"74%",ip:"142",era:"3.41",b:"Sits 99 on the fastball with a mid-90s slider and high-80s curveball. High Stuff+ and high Pitching+. Two risks: fastball command and durability (74%). If he finds command he's a top-10 arm."},
+  "nolan mclean":{r:25,s:108,l:98,p:109,h:"79%",ip:"157",era:"3.69",b:"48-inning debut — struck out nearly a third of batters, great model numbers. More tentative against lefties. Still a prospect with 79% health. If he develops a third pitch, top-15 ceiling."},
+  "chase burns":{r:27,s:116,l:103,p:119,h:"72%",ip:"131",era:"2.96",b:"Pure rocket fuel — sat 99 mph with a 91 mph slider and 36% strikeout rate. Bad BABIP luck inflated his ERA. Among the highest ceilings in the draft. Health risk at 72% is the only real concern."},
+  "zack wheeler":{r:34,s:110,l:108,p:120,h:"67%",ip:"128",era:"3.19",b:"Thoracic Outlet Surgery — hopefully the good kind. When healthy he's an elite arm with 120 Pitching+. Health grade of 67% and limited projected IP make him a late-round gamble on elite upside."},
+  "hunter greene":{r:73,s:120,l:104,p:120,h:"73%",ip:"96",era:"3.24",b:"Sat 99.5 mph on the four-seam for over 100 innings — first time ever done. Dominant when healthy. TJ surgery means limited IP projection (96). Elite 120 Pitching+ when he returns mid-2026."},
+  "reid detmers":{r:78,s:115,l:110,p:122,h:"#N/A",ip:"134",era:"3.65",b:"Elite 122 Pitching+ — among the best in the entire dataset. Stuff+ of 115 plus Location+ of 110 is a rare combination. Health grade unavailable. Sleeper candidate with elite underlying metrics."},
+  "spencer schwellenbach":{r:135,s:107,l:109,p:116,h:"79%",ip:"77",era:"3.55",b:"Both Stuff+ and Location+ are above average — 107 and 109. Pitching+ of 116 suggests strong underlying talent. Limited projected IP (77) due to workload management as he builds arm strength."},
+  "blake snell":{r:54,s:104,l:109,p:114,h:"65%",ip:"105",era:"3.33",b:"Per-inning, few are better. Career ERA lower than almost any pitcher. But he only has about 20 more career innings than Paul Skenes. Boom/bust — elite upside, 65% health, limited IP projection."},
+  "sandy alcantara":{r:48,s:104,l:104,p:105,h:"70%",ip:"176",era:"4.05",b:"From late August on, he had a 3.21 ERA with ground balls and a low walk rate. Coming back from TJ surgery. Good underlying metrics, high IP projection, but 70% health grade reflects real concern."},
+  "grayson rodriguez":{r:999,s:null,l:null,p:null,h:null,ip:null,era:null,b:"Not yet ranked by Eno in this report — young arm with dynasty upside."},
+  "taj bradley":{r:94,s:101,l:92,p:94,h:"88%",ip:"133",era:"4.11",b:"Good health grade at 88%. Average Stuff+ and below-average Location+ (92). Pitching+ of 94 puts him as a fringe SP. Best dynasty value is in his youth and K-rate upside."},
+  "mitch keller":{r:98,s:94,l:100,p:93,h:"93%",ip:"172",era:"4.18",b:"Best health grade (93%) of any SP in the 90-100 range. Average Location+, below-average Stuff+. Pitching+ of 93 is below average. His value is durability and volume — safe if unspectacular."}
+};
+
+function cleanNameEno(n) {
+  // Normalize accents, strip punctuation, lowercase — for ENO_DATA matching
+  return (n||'').toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z0-9 ]/g,' ')
+    .replace(/\s+/g,' ').trim();
+}
+
+function lookupEno(name) {
+  const c = cleanNameEno(name);
+  if (ENO_DATA[c]) return ENO_DATA[c];
+  // Try without suffix Jr/Sr/II/III
+  const s = c.replace(/\b(jr|sr|ii|iii|iv)\b/g,'').replace(/\s+/g,' ').trim();
+  return ENO_DATA[s] || null;
+}
+
+function pitchPlusColor(val) {
+  if (!val) return 'var(--text-muted)';
+  if (val >= 118) return '#4cff91';
+  if (val >= 110) return '#9ee87a';
+  if (val >= 103) return '#ffd700';
+  if (val >= 97)  return '#ff8c42';
+  return '#ff4444';
+}
+
+function healthColor(h) {
+  if (!h || h === '#N/A') return 'var(--text-muted)';
+  const n = parseInt(h);
+  if (isNaN(n)) return 'var(--text-muted)';
+  if (n >= 88) return '#4cff91';
+  if (n >= 75) return '#ffd700';
+  if (n >= 60) return '#ff8c42';
+  return '#ff4444';
+}
+
+
 // prevents false positives from ⚠️ flag being truthy
 // ════════════════════════════════════════════════════════════════════
 const KNOWN_PROSPECTS = new Set([
@@ -910,7 +993,7 @@ async function fetchPlayers() {
         prosp:  KNOWN_PROSPECTS.has(cleanName(name)),
         flag:   (cols[22] || '').trim(),
         notes:  (cols[23] || '').trim(),
-        hkb: 0, hkbRank: 0, dynRank: 0, delta: 0,
+        hkb: 0, hkbRank: 0, dynRank: 0, delta: 0, pitchPlus: null,
       });
     }
 
@@ -948,6 +1031,22 @@ async function fetchPlayers() {
 
     // Delta: positive = we rank higher than market = BUY opportunity
     players.forEach(p => { p.delta = p.hkb > 0 ? p.hkbRank - p.dynRank : 0; });
+
+    // ── INJECT ENO DATA ────────────────────────────────────────────────
+    players.forEach(p => {
+      if (p.type === 'SP' || p.type === 'RP') {
+        const eno = lookupEno(p.name);
+        if (eno) {
+          p.pitchPlus = eno.p;
+          p.stuffPlus = eno.s;
+          p.locPlus   = eno.l;
+          p.health    = eno.h;
+          p.enoRank   = eno.r;
+          p.enoBlurb  = eno.b;
+          p.ppERA     = eno.era;
+        }
+      }
+    });
 
     STATE.players = players;
     STATE.lastSync = new Date().toLocaleTimeString();
@@ -1061,12 +1160,26 @@ function renderPlayerTable() {
       ? `<button class="undo-btn" onclick="undraftPlayer('${esc(p.name)}')">✕ undo</button>`
       : `<button class="draft-btn${myTurn ? ' my-turn' : ''}" onclick="draftPlayer('${esc(p.name)}')">${myTurn ? '◀ MINE' : 'DRAFT'}</button>`;
 
+    // Eno data for pitchers
+    const isPitcher = p.type === 'SP' || p.type === 'RP';
+    const pitchPlusCell = isPitcher && p.pitchPlus
+      ? `<span style="font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:700;color:${pitchPlusColor(p.pitchPlus)}">${p.pitchPlus}</span>${p.enoRank ? `<span style="font-size:9px;color:var(--text-muted);margin-left:3px">ENO#${p.enoRank}</span>` : ''}`
+      : `<span style="color:var(--text-muted)">—</span>`;
+
+    const stuffLocHealth = isPitcher && (p.stuffPlus || p.health)
+      ? `<span class="mono" style="font-size:10px;color:var(--text-dim)">${p.stuffPlus||'—'} · ${p.locPlus||'—'} · <span style="color:${healthColor(p.health)};font-weight:600">${p.health||'—'}</span></span>`
+      : `<span style="color:var(--text-muted)">—</span>`;
+
+    // Blurb tooltip on name (pitcher only, truncated)
+    const blurbTitle = p.enoBlurb ? p.enoBlurb.replace(/"/g,"'") : '';
+    const nameTitle  = blurbTitle ? ` title="${blurbTitle}"` : '';
+
     html += `<tr class="${rowCls}" id="row-${p.name.replace(/[^a-z0-9]/gi,'_')}">
       <td class="mono" style="font-size:11px;color:var(--text-muted);font-weight:600">${p.ovrRk || '—'}</td>
       <td>
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
           ${posPill(p.pos)}
-          <span style="font-weight:600;font-size:14px;color:var(--text)">${p.name}</span>
+          <span style="font-weight:600;font-size:14px;color:var(--text);cursor:${blurbTitle?'help':'default'}"${nameTitle}>${p.name}</span>
           ${nameExtra}${flagExtra}
         </div>
         <div style="margin-top:3px;display:flex;align-items:center;gap:5px">
@@ -1078,6 +1191,8 @@ function renderPlayerTable() {
       <td class="mono" style="font-size:11px;color:var(--text-dim)">${p.team || '—'}</td>
       <td>${p.type === 'SP' ? '<span class="badge badge-aging">SP</span>' : p.type === 'RP' ? '<span class="badge badge-sell">RP</span>' : '<span class="badge badge-young">H</span>'}</td>
       <td class="mono" style="font-size:10px;color:var(--text-dim);white-space:nowrap">${statLine(p)}</td>
+      <td style="white-space:nowrap">${pitchPlusCell}</td>
+      <td>${stuffLocHealth}</td>
       <td class="mono" style="font-size:13px;color:${dynColor};font-weight:700">${p.dynZ !== null ? fmtN(p.dynZ, 3) : '—'}</td>
       <td class="mono" style="font-size:13px;color:var(--purple);font-weight:600">${p.hkb > 0 ? fmtK(p.hkb) : '—'}</td>
       <td class="mono ${delta !== null ? deltaClass(delta) : ''}" style="font-size:11px;font-weight:700" title="HKB rank: ${p.hkbRank} | DYN rank: ${p.dynRank}">${delta !== null ? deltaLabel(delta) : '—'}</td>
@@ -1110,7 +1225,32 @@ function renderPickPanel() {
   const ls = g('lastSync');
   if (ls && STATE.lastSync) ls.textContent = 'Last sync: ' + STATE.lastSync;
 
-  // Snake pick list — show context window around current pick
+  // Countdown clock
+  const cdNum = g('countdownNum');
+  const cdLbl = g('countdownLbl');
+  const cdCard = g('countdownCard');
+  if (cdNum && cdLbl) {
+    const nextMyPick = SNAKE_PICKS.find(sp => sp.overall >= STATE.currentPick);
+    if (!nextMyPick || STATE.currentPick > CONFIG.TOTAL_PICKS) {
+      cdNum.textContent = '✓';
+      cdNum.style.color = 'var(--green)';
+      cdLbl.textContent = 'Draft Complete';
+      if (cdCard) cdCard.style.borderColor = 'var(--green)';
+    } else if (isMyPick(STATE.currentPick)) {
+      cdNum.textContent = 'NOW';
+      cdNum.style.color = 'var(--accent)';
+      cdNum.style.fontSize = '32px';
+      cdLbl.textContent = '🎯 YOUR PICK — ON THE CLOCK';
+      if (cdCard) { cdCard.style.border = '2px solid var(--accent)'; }
+    } else {
+      const picksAway = nextMyPick.overall - STATE.currentPick;
+      cdNum.textContent = picksAway;
+      cdNum.style.fontSize = '42px';
+      cdNum.style.color = picksAway <= 2 ? 'var(--red)' : picksAway <= 5 ? 'var(--orange)' : 'var(--accent)';
+      cdLbl.textContent = `Pick${picksAway===1?'':'s'} Until Your Turn (Rd ${nextMyPick.round}, #${nextMyPick.overall})`;
+      if (cdCard) cdCard.style.border = '1px solid var(--border)';
+    }
+  }
   const pickListEl = g('pickListEl');
   if (pickListEl) {
     const currIdx = SNAKE_PICKS.findIndex(p => p.overall >= STATE.currentPick);
