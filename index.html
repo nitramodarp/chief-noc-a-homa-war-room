@@ -845,34 +845,38 @@ const KNOWN_PROSPECTS = new Set([
 ]);
 // ════════════════════════════════════════════════════════════════════
 const ROSTER_SLOTS = [
-  {id:'C',   label:'C',      posTypes:['C'],             cls:''},
-  {id:'1B',  label:'1B',     posTypes:['1B'],            cls:''},
-  {id:'2B',  label:'2B',     posTypes:['2B'],            cls:''},
-  {id:'3B',  label:'3B',     posTypes:['3B'],            cls:''},
-  {id:'SS',  label:'SS',     posTypes:['SS'],            cls:''},
-  {id:'OF1', label:'OF',     posTypes:['OF'],            cls:''},
-  {id:'OF2', label:'OF',     posTypes:['OF'],            cls:''},
-  {id:'OF3', label:'OF',     posTypes:['OF'],            cls:''},
-  {id:'UTIL',label:'UTIL',   posTypes:['H'],             cls:''},
-  {id:'SP1', label:'SP',     posTypes:['SP'],            cls:''},
-  {id:'SP2', label:'SP',     posTypes:['SP'],            cls:''},
-  {id:'RP1', label:'RP',     posTypes:['RP'],            cls:''},
-  {id:'RP2', label:'RP',     posTypes:['RP'],            cls:''},
-  {id:'P1',  label:'P-FLEX', posTypes:['SP','RP'],       cls:'pflex'},
-  {id:'P2',  label:'P-FLEX', posTypes:['SP','RP'],       cls:'pflex'},
-  {id:'P3',  label:'P-FLEX', posTypes:['SP','RP'],       cls:'pflex'},
-  {id:'P4',  label:'P-FLEX', posTypes:['SP','RP'],       cls:'pflex'},
-  {id:'BN1', label:'BN',     posTypes:['H','SP','RP'],   cls:''},
-  {id:'BN2', label:'BN',     posTypes:['H','SP','RP'],   cls:''},
-  {id:'BN3', label:'BN',     posTypes:['H','SP','RP'],   cls:''},
-  {id:'BN4', label:'BN',     posTypes:['H','SP','RP'],   cls:''},
-  {id:'BN5', label:'BN',     posTypes:['H','SP','RP'],   cls:''},
-  {id:'IL1', label:'IL',     posTypes:['H','SP','RP'],   cls:''},
-  {id:'IL2', label:'IL',     posTypes:['H','SP','RP'],   cls:''},
-  {id:'IL3', label:'IL',     posTypes:['H','SP','RP'],   cls:''},
-  {id:'IL4', label:'IL',     posTypes:['H','SP','RP'],   cls:''},
-  {id:'IL5', label:'IL',     posTypes:['H','SP','RP'],   cls:''},
-  {id:'NA',  label:'NA',     posTypes:['H','SP','RP'],   cls:'naslot'},
+  // ── ACTIVE HITTERS (9) ──────────────────────────────────────────
+  {id:'C',    label:'C',            posTypes:['C'],           cls:'',       role:'Catcher'},
+  {id:'1B',   label:'1B',           posTypes:['1B'],          cls:'',       role:'First Base'},
+  {id:'2B',   label:'2B',           posTypes:['2B'],          cls:'',       role:'Second Base'},
+  {id:'3B',   label:'3B',           posTypes:['3B'],          cls:'',       role:'Third Base'},
+  {id:'SS',   label:'SS',           posTypes:['SS'],          cls:'',       role:'Shortstop'},
+  {id:'OF1',  label:'OF',           posTypes:['OF'],          cls:'',       role:'Outfield 1'},
+  {id:'OF2',  label:'OF',           posTypes:['OF'],          cls:'',       role:'Outfield 2'},
+  {id:'OF3',  label:'OF',           posTypes:['OF'],          cls:'',       role:'Outfield 3'},
+  {id:'UTIL', label:'UTIL',         posTypes:['H'],           cls:'',       role:'Utility Hitter'},
+  // ── ACTIVE PITCHERS (7) ─────────────────────────────────────────
+  {id:'SP1',  label:'SP',           posTypes:['SP'],          cls:'',       role:'Ace SP'},
+  {id:'SP2',  label:'SP',           posTypes:['SP'],          cls:'',       role:'Solid #2 SP'},
+  {id:'RP1',  label:'RP',           posTypes:['RP'],          cls:'',       role:'Elite Closer #1'},
+  {id:'RP2',  label:'RP',           posTypes:['RP'],          cls:'',       role:'Elite Closer #2'},
+  {id:'P1',   label:'P-FLEX · SP3', posTypes:['SP'],          cls:'pflex',  role:'SP3 — Young K-arm'},
+  {id:'P2',   label:'P-FLEX · CL',  posTypes:['RP'],          cls:'pflex',  role:'Closer #3 — SVH+ratios'},
+  {id:'P3',   label:'P-FLEX · CL',  posTypes:['RP'],          cls:'pflex',  role:'Closer #4 — handcuff'},
+  // ── BENCH (5) ───────────────────────────────────────────────────
+  {id:'BN1',  label:'BN · SP',      posTypes:['SP'],          cls:'',       role:'SP bench — injury buffer'},
+  {id:'BN2',  label:'BN · H',       posTypes:['H'],           cls:'',       role:'Multi-pos hitter (2B/SS or 1B/3B)'},
+  {id:'BN3',  label:'BN · H',       posTypes:['H'],           cls:'',       role:'Speed specialist — SB depth'},
+  {id:'BN4',  label:'BN · H',       posTypes:['H'],           cls:'',       role:'Power depth — HR/RBI insurance'},
+  {id:'BN5',  label:'BN · H',       posTypes:['H'],           cls:'',       role:'Young upside hitter age ≤24'},
+  // ── IL (5) ──────────────────────────────────────────────────────
+  {id:'IL1',  label:'IL',           posTypes:['H','SP','RP'], cls:'',       role:'Injured List'},
+  {id:'IL2',  label:'IL',           posTypes:['H','SP','RP'], cls:'',       role:'Injured List'},
+  {id:'IL3',  label:'IL',           posTypes:['H','SP','RP'], cls:'',       role:'Injured List'},
+  {id:'IL4',  label:'IL',           posTypes:['H','SP','RP'], cls:'',       role:'Injured List'},
+  {id:'IL5',  label:'IL',           posTypes:['H','SP','RP'], cls:'',       role:'Injured List'},
+  // ── NA (1) ──────────────────────────────────────────────────────
+  {id:'NA',   label:'NA',           posTypes:['H','SP','RP'], cls:'naslot', role:'Prospect stash — 1 max, age ≤22'},
 ];
 
 // ════════════════════════════════════════════════════════════════════
@@ -1482,50 +1486,106 @@ function toggleHideDrafted(btn) {
 }
 
 function autoAssignSlot(player) {
-  const pos = player.pos.split('/')[0];
+  const pos  = player.pos.split('/')[0];
   const type = player.type;
-  // Priority order for each position
+  const my   = STATE.myDrafted;
+
+  // Count what's already assigned
+  const spFilled  = my.filter(p=>p.type==='SP'&&!p.name.includes('(SP)')).length;
+  const rpFilled  = my.filter(p=>p.type==='RP').length;
+  const bnSPFilled = my.filter(p=>p.type==='SP'&&STATE.rosterSlots['BN1']===p.name).length;
+
+  // SP assignment: SP1 → SP2 → P1(SP3) → BN1 → bench overflow
+  if (type === 'SP') {
+    const spOrder = ['SP1','SP2','P1','BN1'];
+    for (const sid of spOrder) {
+      if (!STATE.rosterSlots[sid]) { STATE.rosterSlots[sid] = player.name; return; }
+    }
+    // All SP slots full — overflow to hitter bench (shouldn't happen with constitution)
+    for (const sid of ['BN2','BN3','BN4','BN5']) {
+      if (!STATE.rosterSlots[sid]) { STATE.rosterSlots[sid] = player.name; return; }
+    }
+    return;
+  }
+
+  // RP assignment: RP1 → RP2 → P2 → P3 — NEVER bench
+  if (type === 'RP') {
+    const rpOrder = ['RP1','RP2','P2','P3'];
+    for (const sid of rpOrder) {
+      if (!STATE.rosterSlots[sid]) { STATE.rosterSlots[sid] = player.name; return; }
+    }
+    // All closer slots full — do NOT put on bench per constitution
+    return;
+  }
+
+  // Hitter assignment by position priority
   const priority = {
-    'C':  ['C','UTIL','BN1','BN2','BN3','BN4','BN5'],
-    '1B': ['1B','UTIL','BN1','BN2','BN3','BN4','BN5'],
-    '2B': ['2B','UTIL','BN1','BN2','BN3','BN4','BN5'],
-    '3B': ['3B','UTIL','BN1','BN2','BN3','BN4','BN5'],
-    'SS': ['SS','UTIL','BN1','BN2','BN3','BN4','BN5'],
-    'OF': ['OF1','OF2','OF3','UTIL','BN1','BN2','BN3','BN4','BN5'],
-    'DH': ['UTIL','BN1','BN2','BN3','BN4','BN5'],
+    'C':   ['C',   'UTIL','BN2','BN3','BN4','BN5'],
+    '1B':  ['1B',  'UTIL','BN2','BN3','BN4','BN5'],
+    '2B':  ['2B',  'UTIL','BN2','BN3','BN4','BN5'],
+    '3B':  ['3B',  'UTIL','BN2','BN3','BN4','BN5'],
+    'SS':  ['SS',  'UTIL','BN2','BN3','BN4','BN5'],
+    'OF':  ['OF1','OF2','OF3','UTIL','BN2','BN3','BN4','BN5'],
+    'DH':  ['UTIL','BN2','BN3','BN4','BN5'],
   };
-  const pitcherSlots = ['SP1','SP2','RP1','RP2','P1','P2','P3','P4','BN1','BN2','BN3','BN4','BN5'];
+  const candidates = priority[pos] || ['UTIL','BN2','BN3','BN4','BN5'];
 
-  const candidates = type === 'SP' ? pitcherSlots
-    : type === 'RP' ? ['RP1','RP2','P1','P2','P3','P4','BN1','BN2','BN3','BN4','BN5']
-    : (priority[pos] || ['BN1','BN2','BN3','BN4','BN5']);
-
-  for (const slotId of candidates) {
-    if (!STATE.rosterSlots[slotId]) {
-      STATE.rosterSlots[slotId] = player.name;
-      return;
+  // Check multi-pos eligibility — try each eligible position
+  const eligiblePos = player.pos.split('/');
+  for (const epos of eligiblePos) {
+    const slots = priority[epos.trim()] || [];
+    for (const sid of slots) {
+      if (!STATE.rosterSlots[sid]) { STATE.rosterSlots[sid] = player.name; return; }
     }
   }
-  // Prospect NA slot
-  if (player.prosp && !STATE.rosterSlots['NA']) STATE.rosterSlots['NA'] = player.name;
+
+  // Prospect → NA slot
+  if (player.prosp && !STATE.rosterSlots['NA']) {
+    STATE.rosterSlots['NA'] = player.name; return;
+  }
+
+  // Final fallback
+  for (const sid of candidates) {
+    if (!STATE.rosterSlots[sid]) { STATE.rosterSlots[sid] = player.name; return; }
+  }
 }
 
 // ════════════════════════════════════════════════════════════════════
-// DRAFT CONSTITUTION
-// Win-now balanced | Best dynasty asset with positional floor
-// 2SP + 2RP + 3P-flex(SV+H,ERA<3.20,WHIP<1.15) | 1 prospect max
-// No RP on bench | Age 35+ only rounds 20+
+// DRAFT CONSTITUTION — Chief Noc-A-Homa · Final · Split A
+// ────────────────────────────────────────────────────────────────────
+// ACTIVE:  C·1B·2B·3B·SS·OF×3·UTIL | SP1·SP2·RP1·RP2·P1(SP3)·P2(CL)·P3(CL)
+// BENCH:   BN1(SP) · BN2-5(H) · NA(1 prospect max)
+// RULES:   4 SPs total (SP1·SP2·P1·BN1) | 4 closers (RP1·RP2·P2·P3)
+//          No RP on bench ever | SP allowed on bench
+//          1 prospect max in NA | Age 35+ only rounds 20+
+// WIN-NOW: Prefer age ≤32 contributors | Fill positional gaps within 2 picks
 // ════════════════════════════════════════════════════════════════════
 const CONSTITUTION = {
-  MAX_PROSPECTS: 1,
-  PFLEX_SLOTS: 3,       // P-flex spots (SV+H arms)
-  RP_SLOTS: 2,          // dedicated RP slots
-  SP_SLOTS: 2,          // dedicated SP slots
-  CLOSER_SVH_MIN: 25,   // minimum projected SVH for P-flex consideration
-  CLOSER_ERA_MAX: 3.20, // maximum ERA for P-flex consideration
-  CLOSER_WHIP_MAX: 1.15,// maximum WHIP for P-flex consideration
-  ACE_HKB_MIN: 4000,    // HKB threshold to qualify as "ace"
-  GAP_GRACE_ROUNDS: 2,  // rounds a positional gap is tolerated before force-fill
+  // Pitching structure
+  SP_ACTIVE:          2,    // SP1, SP2
+  SP_PFLEX:           1,    // P1 = SP3
+  SP_BENCH:           1,    // BN1 = SP injury buffer
+  SP_TOTAL:           4,    // SP1+SP2+P1+BN1
+  RP_ACTIVE:          2,    // RP1, RP2 — elite closers only
+  RP_PFLEX:           2,    // P2, P3 — closers with stellar ratios
+  CLOSER_TOTAL:       4,    // RP1+RP2+P2+P3
+  // Closer quality thresholds for P-flex slots
+  CLOSER_SVH_MIN:     25,
+  CLOSER_ERA_MAX:     3.20,
+  CLOSER_WHIP_MAX:    1.15,
+  // SP quality thresholds
+  ACE_HKB_MIN:        4000,
+  ACE_PITCH_PLUS:     115,
+  // Bench hitters: BN2-5 = 4 hitters (multi-pos, speed, power, young)
+  BENCH_H_SLOTS:      4,
+  // Prospects
+  MAX_PROSPECTS:      1,
+  PROSPECT_AGE_MAX:   22,
+  PROSPECT_RD_MIN:    14,   // don't stash a prospect before round 14
+  // General
+  VET_AGE_CUTOFF:     35,   // avoid 35+ before round 20
+  VET_ROUND_MIN:      20,
+  GAP_GRACE_PICKS:    2,    // picks a positional gap is tolerated before force-fill
 };
 
 // Track how many rounds each position has been empty
@@ -1548,145 +1608,117 @@ function getTakeRecommendation() {
   if (!STATE.players.length) return null;
   const my    = STATE.myDrafted;
   const round = getRound();
-  const avail = p => !STATE.drafted.has(p.name) && p.name !== 'Shohei Ohtani (SP)';
+  const avail = p => !STATE.drafted.has(p.name) && !p.name.includes('(SP)');
+  const C = CONSTITUTION;
 
   // ── Roster counts ─────────────────────────────────────────────────
-  const sps       = my.filter(p => p.type==='SP' && !p.name.includes('(SP)'));
-  const rps       = my.filter(p => p.type==='RP');
-  const allPit    = my.filter(p => p.type==='SP'||p.type==='RP');
-  const prospects = my.filter(p => p.prosp);
-  const closersFilled = rps.filter(p=>(p.stat5||0)>=CONSTITUTION.CLOSER_SVH_MIN).length +
-    sps.filter(p=>(p.stat5||0)>=CONSTITUTION.CLOSER_SVH_MIN).length;
+  const mySPs   = my.filter(p => p.type==='SP' && !p.name.includes('(SP)'));
+  const myRPs   = my.filter(p => p.type==='RP');
+  const myProsp = my.filter(p => p.prosp);
+  const spCount = mySPs.length;
+  const rpCount = myRPs.length;
+  const hasAce  = mySPs.some(p=>(p.hkb||0)>=C.ACE_HKB_MIN||(p.pitchPlus||0)>=C.ACE_PITCH_PLUS);
+  const hasSP2  = spCount >= 2;
+  const spFull  = spCount >= C.SP_TOTAL;   // 4 SPs: SP1+SP2+P1+BN1
+  const rpFull  = rpCount >= C.CLOSER_TOTAL; // 4 closers: RP1+RP2+P2+P3
 
-  // Count pitchers already in bench (bad — we don't want this)
-  const benchPitchers = my.filter(p =>
-    (p.type==='SP'||p.type==='RP') &&
-    !['SP1','SP2','RP1','RP2','P1','P2','P3'].includes(
-      Object.keys(STATE.rosterSlots).find(k => STATE.rosterSlots[k]===p.name)||''
-    )
+  // ── Available pools sorted by HKB desc ────────────────────────────
+  const pool   = STATE.players.filter(avail).sort((a,b)=>(b.hkb||0)-(a.hkb||0));
+  const poolSP = pool.filter(p=>p.type==='SP');
+  const poolRP = pool.filter(p=>p.type==='RP');
+  const poolH  = pool.filter(p=>p.type==='H');
+
+  // Quality sub-pools
+  const aces    = poolSP.filter(p=>(p.hkb||0)>=C.ACE_HKB_MIN||(p.pitchPlus||0)>=C.ACE_PITCH_PLUS);
+  const eliteRP = poolRP.filter(p=>
+    (p.stat5||0)>=C.CLOSER_SVH_MIN &&
+    (p.stat2||99)<=C.CLOSER_ERA_MAX &&
+    (p.stat3||99)<=C.CLOSER_WHIP_MAX
   );
+  const solidRP = poolRP.filter(p=>(p.stat5||0)>=C.CLOSER_SVH_MIN);
 
-  // ── Available pools sorted by HKB ─────────────────────────────────
-  const pool = STATE.players.filter(avail).sort((a,b)=>(b.hkb||0)-(a.hkb||0));
-  const poolSP  = pool.filter(p=>p.type==='SP');
-  const poolRP  = pool.filter(p=>p.type==='RP');
-  const poolH   = pool.filter(p=>p.type==='H');
-
-  // Elite closers: SVH >= threshold + stellar ratios
-  const eliteClosers = poolRP.filter(p =>
-    (p.stat5||0) >= CONSTITUTION.CLOSER_SVH_MIN &&
-    (p.stat2||99) <= CONSTITUTION.CLOSER_ERA_MAX &&
-    (p.stat3||99) <= CONSTITUTION.CLOSER_WHIP_MAX
-  );
-
-  // Aces: top SP by HKB or Pitching+
-  const aces = poolSP.filter(p => (p.hkb||0) >= CONSTITUTION.ACE_HKB_MIN || (p.pitchPlus||0) >= 115);
-
-  // Best dynasty asset overall (win-now: prefer age ≤32 + hkb > 0)
-  const bda = pool.filter(p =>
-    (p.age||99) <= 32 &&
-    (p.hkb||0) > 500 &&
-    !p.prosp
-  )[0] || pool[0];
-
-  const hasAce  = sps.some(p=>(p.hkb||0)>=CONSTITUTION.ACE_HKB_MIN||(p.pitchPlus||0)>=115);
-  const has2SP  = sps.length >= 2;
-  const totalPFlex = CONSTITUTION.PFLEX_SLOTS + CONSTITUTION.RP_SLOTS;
-
-  // ── PRIORITY 1: Force-fill positions empty 2+ picks ───────────────
-  updateGapTracker();
-  const urgentGaps = Object.entries(GAP_TRACKER)
-    .filter(([,count])=>count >= CONSTITUTION.GAP_GRACE_ROUNDS)
-    .sort((a,b)=>b[1]-a[1]);
-
-  for (const [pos] of urgentGaps) {
-    const best = poolH.find(p =>
-      p.pos===pos || p.pos.startsWith(pos+'/') || p.pos.includes('/'+pos));
-    if (best) return {
-      player: best,
-      reason: `⚠️ ${pos} has been empty for ${GAP_TRACKER[pos]} picks — costing you categories every week. Non-negotiable fill.`,
-      tag: `FILL ${pos}`,
-      color: 'var(--red)',
-    };
-  }
-
-  // ── PRIORITY 2: Ace SP if none secured ────────────────────────────
-  if (!hasAce && aces.length && round <= 8) return {
-    player: aces[0],
-    reason: `No ace SP secured yet. ${aces[0].name} has elite stuff${aces[0].pitchPlus ? ` (Pitch+ ${aces[0].pitchPlus})` : ''}. SPs with this upside disappear fast.`,
-    tag: 'ACE SP',
-    color: 'var(--purple)',
-  };
-
-  // ── PRIORITY 3: Elite closer if P-flex not filled ─────────────────
-  // Don't take closers if all 5 RP/P-flex slots full
-  // Don't take closers that would end up on bench
-  if (closersFilled < totalPFlex && eliteClosers.length && round >= 5) {
-    const cl = eliteClosers[0];
-    return {
-      player: cl,
-      reason: `P-flex slot open (${closersFilled}/${totalPFlex} SV+H arms). ${cl.name}: ${cl.stat5} SVH proj, ${cl.stat2?.toFixed(2)||'—'} ERA, ${cl.stat3?.toFixed(3)||'—'} WHIP — stellar ratios.`,
-      tag: `P-FLEX SV+H`,
-      color: 'var(--green)',
-    };
-  }
-
-  // ── PRIORITY 4: Best dynasty asset (win-now filtered) ─────────────
-  // Skip if it's a pitcher that would go to bench
-  // Skip if it's a prospect and we already have MAX_PROSPECTS
-  // Skip age 35+ before round 20
-  const eligible = pool.filter(p => {
-    if (p.prosp && prospects.length >= CONSTITUTION.MAX_PROSPECTS) return false;
-    if ((p.age||0) >= 35 && round < 20) return false;
-    if ((p.type==='RP') && closersFilled >= totalPFlex) return false;
-    if ((p.type==='SP') && has2SP && hasAce) return false; // don't over-SP early
+  // BDA pool — win-now filtered, no bench violations
+  const bdaPool = pool.filter(p=>{
+    if (p.prosp && myProsp.length >= C.MAX_PROSPECTS) return false;
+    if ((p.age||0) >= C.VET_AGE_CUTOFF && round < C.VET_ROUND_MIN) return false;
+    if (p.type==='RP' && rpFull) return false;
+    if (p.type==='SP' && spFull) return false;
     return true;
   });
+  const bda = bdaPool.filter(p=>(p.age||99)<=32&&(p.hkb||0)>500&&!p.prosp)[0]||bdaPool[0];
 
-  const topEligible = eligible.filter(p=>(p.age||99)<=32&&(p.hkb||0)>500&&!p.prosp)[0]
-    || eligible[0];
-
-  if (topEligible) {
-    const isYoung = (topEligible.age||99) <= 24;
-    const ageNote = isYoung ? ` Age ${topEligible.age} — dynasty window 8+ years.` : '';
-    const hkbNote = topEligible.hkb ? ` HKB ${fmtK(topEligible.hkb)}.` : '';
-    const dynNote = topEligible.dynZ ? ` DYN Z ${fmtN(topEligible.dynZ,3)}.` : '';
-    return {
-      player: topEligible,
-      reason: `Best available dynasty asset.${hkbNote}${dynNote}${ageNote}`,
-      tag: 'BDA',
-      color: 'var(--accent)',
+  // ── PRIORITY 1: Force-fill positions empty GAP_GRACE_PICKS ────────
+  updateGapTracker();
+  const urgentGaps = Object.entries(GAP_TRACKER)
+    .filter(([,n])=>n>=C.GAP_GRACE_PICKS)
+    .sort((a,b)=>b[1]-a[1]);
+  for (const [pos] of urgentGaps) {
+    const best = poolH.find(p=>p.pos===pos||p.pos.startsWith(pos+'/')||p.pos.includes('/'+pos));
+    if (best) return {
+      player:best, tag:`FILL ${pos}`, color:'var(--red)',
+      reason:`${pos} empty ${GAP_TRACKER[pos]} picks — free losses every week. Non-negotiable fill.`,
     };
   }
 
-  // ── PRIORITY 5: Second SP if only 1 ───────────────────────────────
-  if (!has2SP && poolSP.length) return {
-    player: poolSP[0],
-    reason: `Only 1 SP drafted. Need a second arm for your SP2 slot. ${poolSP[0].name} is the best available.`,
-    tag: 'SP DEPTH',
-    color: 'var(--purple)',
+  // ── PRIORITY 2: Ace SP if none ────────────────────────────────────
+  if (!hasAce && aces.length && round <= 9) return {
+    player:aces[0], tag:'ACE SP', color:'var(--purple)',
+    reason:`No ace yet. ${aces[0].name}${aces[0].pitchPlus?` (Pitch+ ${aces[0].pitchPlus})`:''}. Elite SPs disappear fast — take now.`,
   };
 
-  // ── PRIORITY 6: Prospect stash (rounds 12+ only, if NA slot open) ─
-  if (prospects.length < CONSTITUTION.MAX_PROSPECTS && round >= 12 && !STATE.rosterSlots['NA'] && pool.filter(p=>p.prosp).length) {
-    const p = pool.filter(p=>p.prosp)[0];
+  // ── PRIORITY 3: Elite closer if slots remain ──────────────────────
+  if (!rpFull && eliteRP.length && round >= 5) {
+    const cl = eliteRP[0];
     return {
-      player: p,
-      reason: `NA slot is open and ${p.name} (age ${p.age}) is the best available prospect stash. Dynasty upside pick.`,
-      tag: 'NA STASH',
-      color: 'var(--purple)',
+      player:cl, tag:`CLOSER #${rpCount+1}`, color:'var(--green)',
+      reason:`${rpCount}/${C.CLOSER_TOTAL} closers filled. ${cl.name}: ${cl.stat5} SVH · ${cl.stat2?.toFixed(2)} ERA · ${cl.stat3?.toFixed(3)} WHIP. Meets all thresholds.`,
     };
   }
 
-  // Fallback: best available anything
+  // ── PRIORITY 4: BDA ───────────────────────────────────────────────
+  if (bda) {
+    if (bda.type==='SP' && spFull) {
+      const nonSP = bdaPool.filter(p=>p.type!=='SP')[0];
+      if (nonSP) return {
+        player:nonSP, tag:'BDA', color:'var(--accent)',
+        reason:`SP slots full (${C.SP_TOTAL}). Next best: ${nonSP.name} · HKB ${fmtK(nonSP.hkb||0)} · Age ${nonSP.age}.`,
+      };
+    }
+    const ageNote = (bda.age||99)<=24 ? ` Age ${bda.age} — 8+ yr dynasty window.` : '';
+    const pitchNote = bda.pitchPlus ? ` Pitch+ ${bda.pitchPlus}.` : '';
+    return {
+      player:bda, tag:'BDA', color:'var(--accent)',
+      reason:`Best available dynasty asset. HKB ${fmtK(bda.hkb||0)} · DYN Z ${fmtN(bda.dynZ,3)}.${pitchNote}${ageNote}`,
+    };
+  }
+
+  // ── PRIORITY 5: Second SP ─────────────────────────────────────────
+  if (!hasSP2 && poolSP.length) return {
+    player:poolSP[0], tag:'SP DEPTH', color:'var(--purple)',
+    reason:`Only 1 SP. Need SP2 before closer hunting. ${poolSP[0].name} is best available.`,
+  };
+
+  // ── PRIORITY 6: Solid RP if no elites left ────────────────────────
+  if (!rpFull && solidRP.length && round >= 8) return {
+    player:solidRP[0], tag:`CLOSER #${rpCount+1}`, color:'var(--yellow)',
+    reason:`No elite closers left. ${solidRP[0].name}: ${solidRP[0].stat5} SVH — best available SV+H arm.`,
+  };
+
+  // ── PRIORITY 7: Prospect stash ────────────────────────────────────
+  if (myProsp.length < C.MAX_PROSPECTS && round >= C.PROSPECT_RD_MIN && !STATE.rosterSlots['NA']) {
+    const prosp = pool.filter(p=>p.prosp&&(p.age||99)<=C.PROSPECT_AGE_MAX)[0];
+    if (prosp) return {
+      player:prosp, tag:'NA STASH', color:'var(--purple)',
+      reason:`NA slot open. ${prosp.name} (age ${prosp.age}) — best prospect stash. 1 max.`,
+    };
+  }
+
+  // Fallback
   return pool[0] ? {
-    player: pool[0],
-    reason: `Best available player remaining on the board.`,
-    tag: 'BPA',
-    color: 'var(--text-dim)',
+    player:pool[0], tag:'BPA', color:'var(--text-dim)',
+    reason:`Best available player on the board.`,
   } : null;
 }
-
 function renderTakeCard() {
   const card = document.getElementById('takeCard');
   if (!card) return;
