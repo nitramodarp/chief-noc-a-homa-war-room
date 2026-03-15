@@ -438,6 +438,8 @@
     .data-table td:nth-child(6),
     .data-table th:nth-child(4),  /* TEAM */
     .data-table td:nth-child(4),
+    .data-table th:nth-child(10), /* VORP */
+    .data-table td:nth-child(10),
     .data-table th:nth-child(12), /* NOTES */
     .data-table td:nth-child(12)
     { display: none; }
@@ -587,7 +589,8 @@
                   <th title="Key projected stats">STAT LINE</th>
                   <th onclick="setSort('pitchPlus')" data-col="pitchPlus" title="Eno Sarris Pitching+ (SPs only). 100=avg, 115+=elite. NOW ADJUSTS DYN Z: ≥118 +12%, ≥110 +5%, ≥103 ±0%, ≥97 -8%, below -15%. ▲/▼ in DYN Z column shows adjustment.">PITCH+</th>
                   <th title="Stuff+ / Location+ / Health — Eno Sarris pitch report. Hover player name for full scouting note." style="min-width:110px">S+ · L+ · HLTH</th>
-                  <th onclick="setSort('dynZ')" data-col="dynZ" title="Our model: z-score × age multiplier (your league's categories)">DYN Z</th>
+                  <th onclick="setSort('dynZ')" data-col="dynZ" title="DYN Z = VORP × age multiplier × Pitch+ adjustment. Primary dynasty ranking signal.">DYN Z</th>
+                  <th onclick="setSort('rawZ')" data-col="rawZ" title="VORP — pure z-score against position pool before age or Pitch+ adjustments. Year-1 production signal.">VORP</th>
                   <th onclick="setSort('hkb')" data-col="hkb" title="HarryKnowsBall crowdsourced dynasty market value">HKB</th>
                   <th onclick="setSort('delta')" data-col="delta" title="Delta: positive = market undervaluing vs our model = BUY. Negative = market overvaluing = SELL.">DELTA</th>
                   <th>NOTES</th>
@@ -652,11 +655,16 @@
   <!-- ═══════════════ MY ROSTER ═══════════════ -->
   <div class="tab-content" id="tab-my-roster">
     <div class="stat-grid-4" id="rosterStatCards">
-      <div class="stat-card"><div class="stat-val" id="rs-count" style="color:var(--accent)">0</div><div class="stat-lbl">Players Drafted</div></div>
-      <div class="stat-card"><div class="stat-val" id="rs-avgdynz" style="color:var(--green)">—</div><div class="stat-lbl">Avg DYN Z</div></div>
-      <div class="stat-card"><div class="stat-val" id="rs-avghkb" style="color:var(--purple)">—</div><div class="stat-lbl">Avg HKB</div></div>
-      <div class="stat-card"><div class="stat-val" id="rs-avgage" style="color:var(--gold)">—</div><div class="stat-lbl">Avg Age</div></div>
-    </div>
+    <div class="stat-card"><div class="stat-val" id="rs-count"     style="color:var(--accent)">0</div><div class="stat-lbl">Players Drafted</div></div>
+    <div class="stat-card"><div class="stat-val" id="rs-teamvorp"  style="color:var(--green)">—</div><div class="stat-lbl">Team VORP</div></div>
+    <div class="stat-card"><div class="stat-val" id="rs-teamhkb"   style="color:var(--purple)">—</div><div class="stat-lbl">Team Dynasty Value</div></div>
+    <div class="stat-card"><div class="stat-val" id="rs-avgage"    style="color:var(--gold)">—</div><div class="stat-lbl">Avg Age</div></div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px">
+    <div class="stat-card"><div class="stat-val" id="rs-avgdynz"  style="color:var(--accent);font-size:22px">—</div><div class="stat-lbl">Avg DYN Z</div></div>
+    <div class="stat-card"><div class="stat-val" id="rs-avgvorp"  style="color:var(--green);font-size:22px">—</div><div class="stat-lbl">Avg VORP</div></div>
+    <div class="stat-card"><div class="stat-val" id="rs-avghkb"   style="color:var(--purple);font-size:22px">—</div><div class="stat-lbl">Avg HKB</div></div>
+  </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
       <div class="panel">
         <div class="panel-title">🗂️ ROSTER SLOTS</div>
@@ -1530,15 +1538,13 @@ async function fetchPlayers() {
         stat3:  pf(cols[8]),
         stat4:  pf(cols[9]),
         stat5:  pf(cols[10]),
-        dynZ:   pf(cols[18]),
+        rawZ:   pf(cols[16]),   // Pure VORP — z-score before age multiplier
+        dynZ:   pf(cols[18]),   // DYN Z — VORP × age multiplier × Pitch+ adj
         poolRk: pi(cols[19]),
         ovrRk:  pi(cols[20]),
         prosp:  KNOWN_PROSPECTS.has(cleanName(name)),
         flag:   (cols[22] || '').trim(),
         notes:  (cols[23] || '').trim(),
-        // Column Y (index 24) = HKB_VALUE entered manually in Google Sheet.
-        // If populated, use it as the primary HKB source.
-        // Fallback to hardcoded lookup table happens after fetch in the HKB inject step.
         sheetHKB: pi(cols[24]) || 0,
         hkb: 0, hkbRank: 0, dynRank: 0, delta: 0, pitchPlus: null,
       });
@@ -1768,6 +1774,7 @@ function renderPlayerTable() {
               ${p.pitchMult>1?'▲':'▼'}P+</span>`
           : ''}
       </td>
+      <td class="mono" style="font-size:12px;color:var(--text-dim);font-weight:600">${p.rawZ !== null ? fmtN(p.rawZ, 3) : '—'}</td>
       <td class="mono" style="font-size:13px;color:var(--purple);font-weight:600">${p.hkb > 0 ? fmtK(p.hkb) : '—'}</td>
       <td class="mono ${delta !== null ? deltaClass(delta) : ''}" style="font-size:11px;font-weight:700" title="HKB rank: ${p.hkbRank} | DYN rank: ${p.dynRank}">${delta !== null ? deltaLabel(delta) : '—'}</td>
       <td style="font-size:10px;color:var(--text-dim);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${p.notes}">${p.notes || ''}</td>
@@ -1879,18 +1886,26 @@ function renderPickPanel() {
 // RENDER: MY ROSTER TAB
 // ════════════════════════════════════════════════════════════════════
 function renderMyRoster() {
-  const count = STATE.myDrafted.length;
-  const validDZ = STATE.myDrafted.filter(p => p.dynZ !== null);
-  const validHKB = STATE.myDrafted.filter(p => p.hkb > 0);
-  const avgDynZ = validDZ.length ? (validDZ.reduce((s, p) => s + p.dynZ, 0) / validDZ.length) : null;
-  const avgHKB  = validHKB.length ? (validHKB.reduce((s, p) => s + p.hkb, 0) / validHKB.length) : null;
-  const avgAge  = count ? (STATE.myDrafted.reduce((s, p) => s + (p.age || 0), 0) / count) : null;
+  const count   = STATE.myDrafted.length;
+  const validDZ = STATE.myDrafted.filter(p => p.dynZ  !== null);
+  const validRZ = STATE.myDrafted.filter(p => p.rawZ  !== null);
+  const validHKB= STATE.myDrafted.filter(p => p.hkb > 0);
+
+  const teamVORP   = validRZ.reduce((s,p)  => s + p.rawZ,  0);
+  const teamHKB    = validHKB.reduce((s,p) => s + p.hkb,   0);
+  const avgDynZ    = validDZ.length  ? validDZ.reduce((s,p)  => s + p.dynZ, 0) / validDZ.length  : null;
+  const avgVORP    = validRZ.length  ? teamVORP / validRZ.length  : null;
+  const avgHKB     = validHKB.length ? teamHKB  / validHKB.length : null;
+  const avgAge     = count ? STATE.myDrafted.reduce((s,p) => s + (p.age||0), 0) / count : null;
 
   const si = id => document.getElementById(id);
-  if (si('rs-count'))   si('rs-count').textContent   = count;
-  if (si('rs-avgdynz')) si('rs-avgdynz').textContent = avgDynZ !== null ? fmtN(avgDynZ, 3) : '—';
-  if (si('rs-avghkb'))  si('rs-avghkb').textContent  = avgHKB  ? fmtK(Math.round(avgHKB)) : '—';
-  if (si('rs-avgage'))  si('rs-avgage').textContent  = avgAge  !== null ? avgAge.toFixed(1) : '—';
+  if (si('rs-count'))    si('rs-count').textContent    = count;
+  if (si('rs-teamvorp')) si('rs-teamvorp').textContent = teamVORP ? fmtN(teamVORP, 2) : '—';
+  if (si('rs-teamhkb'))  si('rs-teamhkb').textContent  = teamHKB  ? fmtK(Math.round(teamHKB)) : '—';
+  if (si('rs-avgage'))   si('rs-avgage').textContent   = avgAge   !== null ? avgAge.toFixed(1)  : '—';
+  if (si('rs-avgdynz'))  si('rs-avgdynz').textContent  = avgDynZ  !== null ? fmtN(avgDynZ, 3)  : '—';
+  if (si('rs-avgvorp'))  si('rs-avgvorp').textContent  = avgVORP  !== null ? fmtN(avgVORP, 3)  : '—';
+  if (si('rs-avghkb'))   si('rs-avghkb').textContent   = avgHKB   ? fmtK(Math.round(avgHKB))   : '—';
 
   // Roster slots
   const slotsEl = document.getElementById('rosterSlotsEl');
