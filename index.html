@@ -2575,43 +2575,63 @@ const POS_URGENCY = {
   '1B': { warn: 3,  force: 6  },  // deep but important for scoring
   '3B': { warn: 4,  force: 7  },
   '2B': { warn: 4,  force: 7  },
-  OF:   { warn: 3,  force: 6  },  // 3 slots — need at least 1 by R6
+  // OF has 3 slots — each tracked separately with escalating urgency
+  // OF1: need at least 1 by round 4 (first slot)
+  // OF2: need at least 2 by round 7 (second slot)
+  // OF3: need at least 3 by round 11 (third slot — bench depth ok to wait)
+  OF1:  { warn: 3,  force: 5  },
+  OF2:  { warn: 5,  force: 7  },
+  OF3:  { warn: 8,  force: 11 },
 };
 
 function getPosGaps() {
-  // Returns array of {pos, urgency:'warn'|'force', best} sorted by urgency
   const my = STATE.myDrafted;
   const round = getRound();
   const avail = p => !STATE.drafted.has(p.name) && !isBanned(p.name);
   const noPros = p => !p.prosp && (p.hkb||0) >= 500;
 
   const has = pos => my.some(p => p.pos===pos||p.pos.startsWith(pos+'/')||p.pos.includes('/'+pos));
-  const ofCount = my.filter(p => p.pos==='OF'||p.pos.startsWith('OF/')).length;
+  const ofCount = my.filter(p =>
+    p.pos==='OF'||p.pos.startsWith('OF/')||p.pos.includes('/OF')
+  ).length;
+
+  const ofPool = STATE.players.filter(p => avail(p) && noPros(p) &&
+    (p.pos==='OF'||p.pos.startsWith('OF/')||p.pos.includes('/OF'))
+  ).sort((a,b)=>(b.hkb||0)-(a.hkb||0));
 
   const gaps = [];
+
+  // Non-OF positions
   const posStates = {
     SS:   !has('SS'),
     C:    !has('C'),
     '1B': !has('1B'),
     '3B': !has('3B'),
     '2B': !has('2B'),
-    OF:   ofCount < 1,
   };
-
   for (const [pos, isEmpty] of Object.entries(posStates)) {
     if (!isEmpty) continue;
     const thresh = POS_URGENCY[pos];
     if (!thresh || round < thresh.warn) continue;
-
     const urgency = round >= thresh.force ? 'force' : 'warn';
     const pool = STATE.players.filter(p => avail(p) && noPros(p) &&
       (p.pos===pos||p.pos.startsWith(pos+'/')||p.pos.includes('/'+pos))
     ).sort((a,b)=>(b.hkb||0)-(a.hkb||0));
-
     if (pool.length) gaps.push({ pos, urgency, best: pool[0], round: thresh.force });
   }
 
-  // Sort: force > warn, then by force round (most urgent first)
+  // OF — 3 slots, each with its own escalating threshold
+  if (ofCount < 1 && round >= POS_URGENCY.OF1.warn && ofPool.length) {
+    const urgency = round >= POS_URGENCY.OF1.force ? 'force' : 'warn';
+    gaps.push({ pos:'OF', urgency, best: ofPool[0], round: POS_URGENCY.OF1.force });
+  } else if (ofCount < 2 && round >= POS_URGENCY.OF2.warn && ofPool.length) {
+    const urgency = round >= POS_URGENCY.OF2.force ? 'force' : 'warn';
+    gaps.push({ pos:'OF', urgency, best: ofPool[0], round: POS_URGENCY.OF2.force });
+  } else if (ofCount < 3 && round >= POS_URGENCY.OF3.warn && ofPool.length) {
+    const urgency = round >= POS_URGENCY.OF3.force ? 'force' : 'warn';
+    gaps.push({ pos:'OF', urgency, best: ofPool[0], round: POS_URGENCY.OF3.force });
+  }
+
   gaps.sort((a,b) => {
     if (a.urgency !== b.urgency) return a.urgency==='force' ? -1 : 1;
     return a.round - b.round;
