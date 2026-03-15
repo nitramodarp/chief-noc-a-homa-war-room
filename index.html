@@ -1715,35 +1715,74 @@ function getTakeRecommendation() {
     reason:`${forceGap.pos} still empty in round ${round} — costing you category points every week. Non-negotiable fill.`,
   };
 
-  // ── PRIORITY 2: Ace SP if none ────────────────────────────────────
-  if (!hasAce && aces.length && round <= 9) return {
-    player:aces[0], tag:'ACE SP', color:'var(--purple)',
-    reason:`No ace yet. ${aces[0].name}${aces[0].pitchPlus?` (Pitch+ ${aces[0].pitchPlus})`:''}. Elite SPs disappear fast — take now.`,
-  };
+  // ── PRIORITY 2: Ace SP if none — but only if BDA isn't elite ─────
+  // Never recommend an ace SP over a player with significantly
+  // higher HKB. If a franchise hitter is available, take them first.
+  if (!hasAce && aces.length && round <= 9) {
+    const aceHKB = aces[0].hkb || 0;
+    const bdaHKB = bda?.hkb || 0;
+    // Only push ace if no franchise-caliber hitter is clearly better
+    // Threshold: BDA must be worth < 1.5× the ace's HKB to take ace
+    if (!bda || bda.type !== 'H' || bdaHKB < aceHKB * 1.5) return {
+      player:aces[0], tag:'ACE SP', color:'var(--purple)',
+      reason:`No ace yet. ${aces[0].name}${aces[0].pitchPlus?` (Pitch+ ${aces[0].pitchPlus})`:''}. Elite SPs disappear fast — take now.`,
+    };
+    // Otherwise fall through to BDA — franchise hitter takes priority
+  }
 
-  // ── PRIORITY 3: Elite closer if slots remain ──────────────────────
-  if (!rpFull && eliteRP.length && round >= 5) {
-    const cl = eliteRP[0];
+  // ── PRIORITY 3: BDA value check — franchise players override closer
+  // Key rule: NEVER recommend a closer over a player with 2× its HKB.
+  // Clay Holmes (1.7k) should never beat Roman Anthony (6.3k).
+  // Closer hunting starts only when BDA value drops to closer range.
+  const bdaHKB   = bda?.hkb || 0;
+  const bestCL   = !rpFull ? eliteRP[0] : null;
+  const clHKB    = bestCL?.hkb || 0;
+  const valueMult = STATE.winNow ? 1.8 : 2.5; // win-now is less patient
+  const closerOverridden = bestCL && bdaHKB >= clHKB * valueMult;
+
+  // ── PRIORITY 3a: Elite closer — only if not overridden by BDA value
+  if (!rpFull && bestCL && round >= 5 && !closerOverridden) {
     return {
-      player:cl, tag:`CLOSER #${rpCount+1}`, color:'var(--green)',
-      reason:`${rpCount}/${C.CLOSER_TOTAL} closers filled. ${cl.name}: ${cl.stat5} SVH · ${cl.stat2?.toFixed(2)} ERA · ${cl.stat3?.toFixed(3)} WHIP. Meets all thresholds.`,
+      player:bestCL, tag:`CLOSER #${rpCount+1}`, color:'var(--green)',
+      reason:`${rpCount}/${C.CLOSER_TOTAL} closers filled. ${bestCL.name}: ${bestCL.stat5} SVH · ${bestCL.stat2?.toFixed(2)} ERA · ${bestCL.stat3?.toFixed(3)} WHIP. BDA (${fmtK(bdaHKB)}) is close enough in value.`,
     };
   }
 
-  // ── PRIORITY 4: BDA ───────────────────────────────────────────────
+  // ── PRIORITY 4: BDA — sorted by mode ──────────────────────────────
+  // DYNASTY mode:  sort by DYN Z (age-weighted model — values youth)
+  // WIN-NOW mode:  sort by HKB  (market value — values contributors)
+  // This is what the toggle actually changes.
   if (bda) {
-    if (bda.type==='SP' && spFull) {
-      const nonSP = bdaPool.filter(p=>p.type!=='SP')[0];
+    // Re-sort BDA pool by mode
+    const sortedBDA = [...bdaPool].sort((a,b) =>
+      STATE.winNow
+        ? (b.hkb||0)  - (a.hkb||0)    // win-now: market value
+        : (b.dynZ||0) - (a.dynZ||0)    // dynasty: age-weighted model
+    ).filter(p => p.type !== 'SP' || !spFull);
+
+    const pick = sortedBDA[0] || bda;
+    if (pick.type==='SP' && spFull) {
+      const nonSP = sortedBDA.find(p=>p.type!=='SP');
       if (nonSP) return {
         player:nonSP, tag:'BDA', color:'var(--accent)',
-        reason:`SP slots full (${C.SP_TOTAL}). Next best: ${nonSP.name} · HKB ${fmtK(nonSP.hkb||0)} · Age ${nonSP.age}.`,
+        reason:`SP slots full. Next best: ${nonSP.name} · HKB ${fmtK(nonSP.hkb||0)} · Age ${nonSP.age}.`,
       };
     }
-    const ageNote = (bda.age||99)<=24 ? ` Age ${bda.age} — 8+ yr dynasty window.` : '';
-    const pitchNote = bda.pitchPlus ? ` Pitch+ ${bda.pitchPlus}.` : '';
+
+    const modeNote = STATE.winNow
+      ? `WIN-NOW sort: HKB ${fmtK(pick.hkb||0)} (market value).`
+      : `DYNASTY sort: DYN Z ${fmtN(pick.dynZ,3)} (age-weighted).`;
+    const ageNote  = (pick.age||99)<=24 ? ` Age ${pick.age} — 8+ yr window.` : '';
+    const pitchNote= pick.pitchPlus ? ` Pitch+ ${pick.pitchPlus}.` : '';
+
+    // If a closer was overridden by this BDA, call it out
+    const deferNote = (closerOverridden && bestCL)
+      ? ` Deferring ${bestCL.name} (${fmtK(clHKB)}) — ${fmtK(bdaHKB)} is ${Math.round(bdaHKB/clHKB)}× more valuable.`
+      : '';
+
     return {
-      player:bda, tag:'BDA', color:'var(--accent)',
-      reason:`Best available dynasty asset. HKB ${fmtK(bda.hkb||0)} · DYN Z ${fmtN(bda.dynZ,3)}.${pitchNote}${ageNote}`,
+      player:pick, tag:'BDA', color:'var(--accent)',
+      reason:`${modeNote}${pitchNote}${ageNote}${deferNote}`,
     };
   }
 
@@ -1828,14 +1867,17 @@ function setWinNowMode(winNow) {
   const desc = document.getElementById('modeDesc');
   if (btn0 && btn1) {
     btn0.style.background = winNow ? 'transparent' : 'var(--accent)';
-    btn0.style.color = winNow ? 'var(--text-muted)' : '#000';
-    btn1.style.background = winNow ? 'var(--gold)' : 'transparent';
-    btn1.style.color = winNow ? '#000' : 'var(--text-muted)';
+    btn0.style.color       = winNow ? 'var(--text-muted)' : '#000';
+    btn1.style.background  = winNow ? 'var(--gold)' : 'transparent';
+    btn1.style.color       = winNow ? '#000' : 'var(--text-muted)';
   }
   if (desc) desc.textContent = winNow
-    ? 'Balancing year-1 contribution + long-term upside'
-    : 'Prioritizing youth & upside';
+    ? 'BDA sorted by HKB — proven contributors, age ≤32 preferred'
+    : 'BDA sorted by DYN Z — age-weighted model, youth prioritized';
+  // Re-render everything — toggle changes TAKE card recommendation
+  renderTakeCard();
   renderAdviceBar();
+  renderPlayerTable(); // resorting may change visible rankings
 }
 
 // ════════════════════════════════════════════════════════════════════
