@@ -391,7 +391,22 @@
       <!-- LEFT: Player Board -->
       <div>
         <div class="panel" style="margin-bottom:0">
-          <!-- WAR ROOM ADVICE BAR -->
+          <!-- WIN-NOW TOGGLE + WAR ROOM ADVICE BAR -->
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap">
+            <div style="display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:3px 4px">
+              <button id="modeBtn0" onclick="setWinNowMode(false)"
+                style="padding:4px 12px;border-radius:16px;border:none;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:600;letter-spacing:0.5px;background:var(--accent);color:#000;transition:all 0.2s">
+                🏗 DYNASTY
+              </button>
+              <button id="modeBtn1" onclick="setWinNowMode(true)"
+                style="padding:4px 12px;border-radius:16px;border:none;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:600;letter-spacing:0.5px;background:transparent;color:var(--text-muted);transition:all 0.2s">
+                🏆 WIN-NOW
+              </button>
+            </div>
+            <span id="modeDesc" style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--text-muted);letter-spacing:0.5px">
+              Prioritizing youth &amp; upside
+            </span>
+          </div>
           <div id="adviceBar" style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap"></div>
 
           <div class="filter-row" id="filterBtns">
@@ -847,6 +862,7 @@ const STATE = {
   tradeGet: [],
   waiverFilter: 'ALL',
   lastSync: null,
+  winNow: false,   // false = dynasty-first, true = balanced win-now
 };
 
 // ════════════════════════════════════════════════════════════════════
@@ -1463,8 +1479,263 @@ function autoAssignSlot(player) {
 }
 
 // ════════════════════════════════════════════════════════════════════
-// WAR ROOM ADVICE ENGINE — Round-aware dynasty best practices
+// WIN-NOW TOGGLE
 // ════════════════════════════════════════════════════════════════════
+function setWinNowMode(winNow) {
+  STATE.winNow = winNow;
+  const btn0 = document.getElementById('modeBtn0');
+  const btn1 = document.getElementById('modeBtn1');
+  const desc = document.getElementById('modeDesc');
+  if (btn0 && btn1) {
+    btn0.style.background = winNow ? 'transparent' : 'var(--accent)';
+    btn0.style.color = winNow ? 'var(--text-muted)' : '#000';
+    btn1.style.background = winNow ? 'var(--gold)' : 'transparent';
+    btn1.style.color = winNow ? '#000' : 'var(--text-muted)';
+  }
+  if (desc) desc.textContent = winNow
+    ? 'Balancing year-1 contribution + long-term upside'
+    : 'Prioritizing youth & upside';
+  renderAdviceBar();
+}
+
+// ════════════════════════════════════════════════════════════════════
+// WAR ROOM ADVICE ENGINE — Round-aware + win-now balance
+// ════════════════════════════════════════════════════════════════════
+function getWarRoomAdvice() {
+  const my = STATE.myDrafted;
+  const round = getRound();
+  const winNow = STATE.winNow;
+  const avail = p => !STATE.drafted.has(p.name);
+  const advices = [];
+
+  // ── Roster inventory ─────────────────────────────────────────────
+  const sps       = my.filter(p => p.type === 'SP');
+  const rps       = my.filter(p => p.type === 'RP');
+  const hitters   = my.filter(p => p.type === 'H');
+  const prospects = my.filter(p => p.prosp);
+  const hasAce    = sps.some(p => (p.hkb||0) >= 4500 || (p.dynZ||0) > 0.6);
+  const closers   = rps.filter(p => (p.stat5||0) >= 30);
+  const hasC      = my.some(p => p.pos === 'C');
+  const has1B     = my.some(p => p.pos === '1B' || p.pos.startsWith('1B/'));
+  const has2B     = my.some(p => p.pos === '2B' || p.pos.startsWith('2B/') || p.pos.includes('/2B'));
+  const has3B     = my.some(p => p.pos === '3B' || p.pos.startsWith('3B/') || p.pos.includes('/3B'));
+  const hasSS     = my.some(p => p.pos === 'SS' || p.pos.startsWith('SS/') || p.pos.includes('/SS'));
+  const ofCount   = my.filter(p => p.pos === 'OF' || p.pos.startsWith('OF/')).length;
+  const hasProsp  = prospects.length > 0;
+  const avgAge    = my.length ? my.reduce((s,p) => s+(p.age||27),0)/my.length : 0;
+
+  // Win-now: care about immediate contributors (age ≤32, hkb ≥1500)
+  const isContributor = p => (p.age||99) <= 32 && (p.hkb||0) >= 1500 && !p.prosp;
+
+  // ── Available pools ───────────────────────────────────────────────
+  const A = {
+    sp:       STATE.players.filter(p => p.type==='SP' && avail(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
+    rp:       STATE.players.filter(p => p.type==='RP' && avail(p) && (p.stat5||0)>=30).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
+    hitter:   STATE.players.filter(p => p.type==='H' && avail(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
+    youngH:   STATE.players.filter(p => p.type==='H' && avail(p) && (p.age||99)<=28).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
+    eliteH:   STATE.players.filter(p => p.type==='H' && avail(p) && (p.hkb||0)>=4000).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
+    contrib:  STATE.players.filter(p => avail(p) && isContributor(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
+    c1B:      STATE.players.filter(p => (p.pos==='1B'||p.pos.startsWith('1B/')) && avail(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
+    c2B:      STATE.players.filter(p => (p.pos==='2B'||p.pos.startsWith('2B/')||p.pos.includes('/2B')) && avail(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
+    c3B:      STATE.players.filter(p => (p.pos==='3B'||p.pos.startsWith('3B/')||p.pos.includes('/3B')) && avail(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
+    catcher:  STATE.players.filter(p => p.pos==='C' && avail(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
+    ss:       STATE.players.filter(p => (p.pos==='SS'||p.pos.startsWith('SS/')||p.pos.includes('/SS')) && avail(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
+    of:       STATE.players.filter(p => (p.pos==='OF'||p.pos.startsWith('OF/')) && avail(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
+    youngSP:  STATE.players.filter(p => p.type==='SP' && avail(p) && (p.age||99)<=27).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
+    prosp:    STATE.players.filter(p => p.prosp && avail(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
+    youngAll: STATE.players.filter(p => avail(p) && (p.age||99)<=23).sort((a,b)=>(b.hkb||0)-(a.hkb||0)),
+  };
+
+  const nm  = p => p ? `${p.name} (${p.age}, ${p.pos})` : '—';
+  const hk  = p => p && p.hkb ? ` · HKB ${fmtK(p.hkb)}` : '';
+
+  // ══════════════════════════════════════════════════════════════════
+  // POSITIONAL COMPLETENESS — runs every round, highest priority
+  // An empty starting slot is always an emergency in win-now mode,
+  // and escalates to critical after round 8 in dynasty mode.
+  // ══════════════════════════════════════════════════════════════════
+  const posGaps = [];
+  if (!has1B && A.c1B.length)     posGaps.push({ pos:'1B', pool:A.c1B,    icon:'🚨', label:'NO 1B' });
+  if (!hasSS && A.ss.length)      posGaps.push({ pos:'SS', pool:A.ss,     icon:'🚨', label:'NO SS' });
+  if (!has3B && A.c3B.length && round >= 4) posGaps.push({ pos:'3B', pool:A.c3B, icon:'⚠️', label:'NO 3B' });
+  if (!has2B && A.c2B.length && round >= 4) posGaps.push({ pos:'2B', pool:A.c2B, icon:'⚠️', label:'NO 2B' });
+  if (!hasC  && A.catcher.length) posGaps.push({ pos:'C',  pool:A.catcher, icon:'⚠️', label:'NO C' });
+  if (ofCount < 1 && A.of.length) posGaps.push({ pos:'OF', pool:A.of,     icon:'⚠️', label:'NO OF' });
+
+  // In win-now mode, gap threshold is immediate (round 1+)
+  // In dynasty mode, gaps become critical after round 6
+  const gapThreshold = winNow ? 1 : 6;
+
+  if (posGaps.length && round >= gapThreshold) {
+    const gap = posGaps[0];
+    const urgency = (winNow || round >= 10) ? 'var(--red)' : 'var(--orange)';
+    const top = gap.pool[0];
+    advices.push({ color: urgency, icon: gap.icon,
+      msg: `${gap.label} — Starting slot empty, scoring 0 every week. Fill now: ${nm(top)}${hk(top)}` });
+    if (posGaps.length > 1) {
+      const gap2 = posGaps[1];
+      advices.push({ color:'var(--orange)', icon:'⚠️',
+        msg:`Also ${gap2.label} — ${nm(gap2.pool[0])}${hk(gap2.pool[0])}` });
+    }
+    return advices.slice(0,2);
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // ROUND 1 — Elite youth first. Never reach for aging SP.
+  // ══════════════════════════════════════════════════════════════════
+  if (round === 1) {
+    if (A.eliteH.length) {
+      const topH = A.eliteH[0];
+      const topSP = A.sp[0];
+      if (topSP && (topSP.age||0) >= 29 && (topH.age||0) <= 28 && (topH.hkb||0) >= (topSP.hkb||0) * 0.8) {
+        advices.push({ color:'var(--red)', icon:'🚨',
+          msg:`R1 RULE — Take ${nm(topH)}${hk(topH)} over ${topSP.name} (age ${topSP.age}). Never reach for aging SP in R1.` });
+      } else {
+        advices.push({ color:'var(--accent)', icon:'🎯',
+          msg:`R1 BPA — Best available: ${nm(topH)}${hk(topH)}. Target age ≤28 with 6+ year window.` });
+      }
+    }
+    if (A.ss.length && (A.ss[0].hkb||0) >= 4000) {
+      advices.push({ color:'var(--blue)', icon:'⚡',
+        msg:`ELITE SS AVAILABLE — ${nm(A.ss[0])}${hk(A.ss[0])} — franchise-level asset, premium position.` });
+    }
+    return advices.slice(0,2);
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // ROUNDS 2–3
+  // ══════════════════════════════════════════════════════════════════
+  if (round <= 3) {
+    if (!hasSS && A.ss.length)
+      advices.push({ color:'var(--red)', icon:'🚨',
+        msg:`SS SCARCITY — Thinnest position in dynasty. Take ${nm(A.ss[0])}${hk(A.ss[0])} now or miss out.` });
+    if (winNow && !has1B && A.c1B.length)
+      advices.push({ color:'var(--orange)', icon:'⚠️',
+        msg:`1B GAP — Win-now mode: ${nm(A.c1B[0])}${hk(A.c1B[0])} contributes immediately.` });
+    if (!advices.length && A.youngH.length)
+      advices.push({ color:'var(--accent)', icon:'🎯',
+        msg:`R2-3 BPA — ${nm(A.youngH[0])}${hk(A.youngH[0])}. Stack elite youth now.` });
+    return advices.slice(0,2);
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // ROUNDS 4–6
+  // ══════════════════════════════════════════════════════════════════
+  if (round <= 6) {
+    if (!has1B && A.c1B.length)
+      advices.push({ color:'var(--red)', icon:'🚨',
+        msg:`NO 1B — Empty starting slot costs you every week. Take ${nm(A.c1B[0])}${hk(A.c1B[0])}.` });
+    if (!hasAce && A.sp.length)
+      advices.push({ color:'var(--red)', icon:'🚨',
+        msg:`SECURE AN ACE — No elite SP yet. ${nm(A.sp[0])}${hk(A.sp[0])}.` });
+    if (winNow && A.contrib.length && !advices.length)
+      advices.push({ color:'var(--gold)', icon:'🏆',
+        msg:`WIN-NOW BPA — ${nm(A.contrib[0])}${hk(A.contrib[0])} — immediate contributor, proven production.` });
+    if (!advices.length && A.youngH.length)
+      advices.push({ color:'var(--accent)', icon:'🎯',
+        msg:`R4-6 BPA — ${nm(A.youngH[0])}${hk(A.youngH[0])}.` });
+    return advices.slice(0,2);
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // ROUNDS 7–10 — Closer window, fill gaps
+  // ══════════════════════════════════════════════════════════════════
+  if (round <= 10) {
+    const closersNeeded = Math.max(0, 6 - closers.length);
+    if (!has1B && A.c1B.length)
+      advices.push({ color:'var(--red)', icon:'🚨',
+        msg:`NO 1B — Critical gap. ${nm(A.c1B[0])}${hk(A.c1B[0])}. Empty slot = free losses every week.` });
+    else if (closersNeeded >= 4 && A.rp.length)
+      advices.push({ color:'var(--red)', icon:'🚨',
+        msg:`SV+H EMERGENCY — Only ${closers.length}/6 closers. Take ${nm(A.rp[0])} · ${A.rp[0].stat5} SVH.` });
+    else if (closersNeeded >= 2 && A.rp.length)
+      advices.push({ color:'var(--green)', icon:'🔒',
+        msg:`CLOSER WINDOW — Need ${closersNeeded} more SV+H arm${closersNeeded>1?'s':''}. ${nm(A.rp[0])} · ${A.rp[0].stat5} SVH.` });
+    if (winNow && A.contrib.length && advices.length < 2)
+      advices.push({ color:'var(--gold)', icon:'🏆',
+        msg:`WIN-NOW DEPTH — ${nm(A.contrib[0])}${hk(A.contrib[0])} — contributes in 2026 while you build.` });
+    else if (!hasC && A.catcher.length)
+      advices.push({ color:'var(--red)', icon:'🚨',
+        msg:`NO CATCHER — ${nm(A.catcher[0])}${hk(A.catcher[0])}.` });
+    if (!advices.length)
+      advices.push({ color:'var(--accent)', icon:'🎯',
+        msg:`R7-10 BPA — ${nm(A.hitter[0]||A.sp[0])}${hk(A.hitter[0]||A.sp[0])}.` });
+    return advices.slice(0,2);
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // ROUNDS 11–15 — Depth + upside + prospect stash
+  // ══════════════════════════════════════════════════════════════════
+  if (round <= 15) {
+    const closersNeeded = Math.max(0, 6 - closers.length);
+    // Fill any remaining positional gaps first
+    if (!has1B && A.c1B.length)
+      advices.push({ color:'var(--red)', icon:'🚨',
+        msg:`STILL NO 1B — ${nm(A.c1B[0])}${hk(A.c1B[0])}. This is costing you categories every week.` });
+    else if (closersNeeded > 0 && A.rp.length)
+      advices.push({ color:'var(--green)', icon:'🔒',
+        msg:`SV+H DEPTH — ${closersNeeded} closer slot${closersNeeded>1?'s':''} open. ${nm(A.rp[0])} · ${A.rp[0].stat5} SVH.` });
+    if (!hasProsp && A.prosp.length)
+      advices.push({ color:'var(--purple)', icon:'★',
+        msg:`STASH A PROSPECT — NA slot empty. ${nm(A.prosp[0])}${hk(A.prosp[0])} — dynasty upside.` });
+    if (winNow && advices.length < 2 && A.contrib.length)
+      advices.push({ color:'var(--gold)', icon:'🏆',
+        msg:`WIN-NOW PICK — ${nm(A.contrib[0])}${hk(A.contrib[0])} — quality depth, contributes in 2026.` });
+    if (!advices.length) {
+      const youngKArm = A.sp.find(p => (p.age||99)<=26 && (p.stat1||0)>=140);
+      if (youngKArm)
+        advices.push({ color:'var(--purple)', icon:'💪',
+          msg:`YOUNG K-ARM — ${nm(youngKArm)}${hk(youngKArm)} · ${youngKArm.stat1}K proj. Dynasty SP upside.` });
+      else
+        advices.push({ color:'var(--accent)', icon:'🎯',
+          msg:`R11-15 — ${nm(A.youngAll[0]||A.hitter[0])}. Favor age ≤25 in these rounds.` });
+    }
+    return advices.slice(0,2);
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // ROUNDS 16–23 — Lottery. Age ≤23 only. No old vets.
+  // ══════════════════════════════════════════════════════════════════
+  if (round <= 23) {
+    const closersNeeded = Math.max(0, 6 - closers.length);
+    if (!has1B && A.c1B.length)
+      advices.push({ color:'var(--red)', icon:'🚨',
+        msg:`STILL NO 1B — Last chance. ${nm(A.c1B[0])}${hk(A.c1B[0])}.` });
+    if (closersNeeded > 0 && A.rp.length)
+      advices.push({ color:'var(--green)', icon:'🔒',
+        msg:`HANDCUFF CLOSER — ${nm(A.rp[0])} · ${A.rp[0].stat5} SVH. Young arm with save upside.` });
+    if (!hasProsp && A.prosp.length)
+      advices.push({ color:'var(--purple)', icon:'★',
+        msg:`LAST CALL: STASH — ${nm(A.prosp[0])}${hk(A.prosp[0])} for NA slot. Pure dynasty upside.` });
+    const lotteryArm = A.sp.find(p => (p.age||99)<=24);
+    const lotteryBat = A.hitter.find(p => (p.age||99)<=23);
+    const pick = lotteryBat || lotteryArm;
+    if (!advices.length && pick)
+      advices.push({ color:'var(--blue)', icon:'🎰',
+        msg:`LOTTERY — ${nm(pick)}${hk(pick)}. Age ≤24 only. Swing for upside.` });
+    if (!advices.length)
+      advices.push({ color:'var(--text-muted)', icon:'🎰',
+        msg:`R${round} DART THROW — Age ≤24 only. Zero value in 33+ vets.` });
+    return advices.slice(0,2);
+  }
+
+  return [{ color:'var(--accent)', icon:'✅', msg:'Draft complete! Head to My Roster to review.' }];
+}
+
+function renderAdviceBar() {
+  const bar = document.getElementById('adviceBar');
+  if (!bar) return;
+  if (!STATE.players.length) { bar.innerHTML = ''; return; }
+  const advices = getWarRoomAdvice();
+  bar.innerHTML = advices.map(a =>
+    `<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--surface2);
+      border-radius:8px;border:1px solid rgba(46,46,74,0.6);border-left:3px solid ${a.color};flex:1;min-width:0">
+      <span style="font-size:18px;flex-shrink:0">${a.icon}</span>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:${a.color};
+        font-weight:600;letter-spacing:0.3px;line-height:1.4">${a.msg}</span>
+    </div>`
+  ).join('');
+}
 function getWarRoomAdvice() {
   const my = STATE.myDrafted;
   const round = getRound();
