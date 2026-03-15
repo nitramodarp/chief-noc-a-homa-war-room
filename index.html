@@ -331,6 +331,32 @@
   /* TOOLTIP */
   [title] { cursor: help; }
 
+  /* TAKE BUTTON */
+  .take-card {
+    background: linear-gradient(135deg, rgba(0,212,255,0.08) 0%, rgba(180,76,255,0.08) 100%);
+    border: 2px solid var(--accent); border-radius: 12px; padding: 14px;
+    margin-bottom: 12px; display: none;
+  }
+  .take-card.visible { display: block; animation: pulse 1.5s ease-in-out infinite; }
+  .take-player-name {
+    font-family: 'Bebas Neue', cursive; font-size: 22px; letter-spacing: 2px;
+    color: var(--text); line-height: 1.1; margin: 6px 0 4px;
+  }
+  .take-reason {
+    font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--text-dim);
+    line-height: 1.5; margin-bottom: 10px;
+  }
+  .take-btn {
+    width: 100%; padding: 12px; font-family: 'Bebas Neue', cursive;
+    font-size: 22px; letter-spacing: 4px; border: none; border-radius: 8px;
+    cursor: pointer; color: #000;
+    background: linear-gradient(135deg, var(--accent), var(--purple));
+    transition: opacity 0.15s; box-shadow: 0 4px 20px rgba(0,212,255,0.3);
+  }
+  .take-btn:hover { opacity: 0.85; }
+  .take-btn:active { transform: scale(0.98); }
+  .take-meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 4px; }
+
   /* SCROLLBAR */
   ::-webkit-scrollbar { width: 5px; height: 5px; }
   ::-webkit-scrollbar-track { background: var(--surface); }
@@ -395,16 +421,16 @@
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap">
             <div style="display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:3px 4px">
               <button id="modeBtn0" onclick="setWinNowMode(false)"
-                style="padding:4px 12px;border-radius:16px;border:none;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:600;letter-spacing:0.5px;background:var(--accent);color:#000;transition:all 0.2s">
+                style="padding:4px 12px;border-radius:16px;border:none;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:600;letter-spacing:0.5px;background:transparent;color:var(--text-muted);transition:all 0.2s">
                 🏗 DYNASTY
               </button>
               <button id="modeBtn1" onclick="setWinNowMode(true)"
-                style="padding:4px 12px;border-radius:16px;border:none;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:600;letter-spacing:0.5px;background:transparent;color:var(--text-muted);transition:all 0.2s">
+                style="padding:4px 12px;border-radius:16px;border:none;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:600;letter-spacing:0.5px;background:var(--gold);color:#000;transition:all 0.2s">
                 🏆 WIN-NOW
               </button>
             </div>
             <span id="modeDesc" style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--text-muted);letter-spacing:0.5px">
-              Prioritizing youth &amp; upside
+              Balancing year-1 contribution + long-term upside
             </span>
           </div>
           <div id="adviceBar" style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap"></div>
@@ -473,8 +499,14 @@
           </div>
         </div>
 
-        <!-- PICKS UNTIL YOUR TURN -->
-        <div id="countdownCard" class="panel" style="padding:12px;margin-bottom:0;text-align:center">
+        <!-- TAKE CARD — shown only on your pick -->
+        <div class="take-card" id="takeCard">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--accent);text-transform:uppercase">⚡ War Room Recommends</div>
+          <div class="take-meta" id="takeMeta"></div>
+          <div class="take-player-name" id="takePlayerName">—</div>
+          <div class="take-reason" id="takeReason"></div>
+          <button class="take-btn" id="takeBtn" onclick="executeTake()">TAKE</button>
+        </div>
           <div id="countdownNum" style="font-family:'Bebas Neue',cursive;font-size:42px;letter-spacing:3px;line-height:1;color:var(--accent)">—</div>
           <div id="countdownLbl" style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--text-muted);text-transform:uppercase;margin-top:3px">Picks Until Your Turn</div>
         </div>
@@ -862,7 +894,7 @@ const STATE = {
   tradeGet: [],
   waiverFilter: 'ALL',
   lastSync: null,
-  winNow: false,   // false = dynasty-first, true = balanced win-now
+  winNow: true,   // true = win-now balance (user preference)
 };
 
 // ════════════════════════════════════════════════════════════════════
@@ -1476,6 +1508,227 @@ function autoAssignSlot(player) {
   }
   // Prospect NA slot
   if (player.prosp && !STATE.rosterSlots['NA']) STATE.rosterSlots['NA'] = player.name;
+}
+
+// ════════════════════════════════════════════════════════════════════
+// DRAFT CONSTITUTION
+// Win-now balanced | Best dynasty asset with positional floor
+// 2SP + 2RP + 3P-flex(SV+H,ERA<3.20,WHIP<1.15) | 1 prospect max
+// No RP on bench | Age 35+ only rounds 20+
+// ════════════════════════════════════════════════════════════════════
+const CONSTITUTION = {
+  MAX_PROSPECTS: 1,
+  PFLEX_SLOTS: 3,       // P-flex spots (SV+H arms)
+  RP_SLOTS: 2,          // dedicated RP slots
+  SP_SLOTS: 2,          // dedicated SP slots
+  CLOSER_SVH_MIN: 25,   // minimum projected SVH for P-flex consideration
+  CLOSER_ERA_MAX: 3.20, // maximum ERA for P-flex consideration
+  CLOSER_WHIP_MAX: 1.15,// maximum WHIP for P-flex consideration
+  ACE_HKB_MIN: 4000,    // HKB threshold to qualify as "ace"
+  GAP_GRACE_ROUNDS: 2,  // rounds a positional gap is tolerated before force-fill
+};
+
+// Track how many rounds each position has been empty
+const GAP_TRACKER = { C:0, '1B':0, '2B':0, '3B':0, SS:0, OF:0 };
+
+function updateGapTracker() {
+  const my = STATE.myDrafted;
+  const has = pos => my.some(p =>
+    p.pos === pos || p.pos.startsWith(pos+'/') || p.pos.includes('/'+pos));
+  const ofCount = my.filter(p => p.pos==='OF'||p.pos.startsWith('OF/')).length;
+  GAP_TRACKER['C']  = has('C')        ? 0 : GAP_TRACKER['C']  + 1;
+  GAP_TRACKER['1B'] = has('1B')       ? 0 : GAP_TRACKER['1B'] + 1;
+  GAP_TRACKER['2B'] = has('2B')       ? 0 : GAP_TRACKER['2B'] + 1;
+  GAP_TRACKER['3B'] = has('3B')       ? 0 : GAP_TRACKER['3B'] + 1;
+  GAP_TRACKER['SS'] = has('SS')       ? 0 : GAP_TRACKER['SS'] + 1;
+  GAP_TRACKER['OF'] = ofCount >= 1    ? 0 : GAP_TRACKER['OF'] + 1;
+}
+
+function getTakeRecommendation() {
+  if (!STATE.players.length) return null;
+  const my    = STATE.myDrafted;
+  const round = getRound();
+  const avail = p => !STATE.drafted.has(p.name) && p.name !== 'Shohei Ohtani (SP)';
+
+  // ── Roster counts ─────────────────────────────────────────────────
+  const sps       = my.filter(p => p.type==='SP' && !p.name.includes('(SP)'));
+  const rps       = my.filter(p => p.type==='RP');
+  const allPit    = my.filter(p => p.type==='SP'||p.type==='RP');
+  const prospects = my.filter(p => p.prosp);
+  const closersFilled = rps.filter(p=>(p.stat5||0)>=CONSTITUTION.CLOSER_SVH_MIN).length +
+    sps.filter(p=>(p.stat5||0)>=CONSTITUTION.CLOSER_SVH_MIN).length;
+
+  // Count pitchers already in bench (bad — we don't want this)
+  const benchPitchers = my.filter(p =>
+    (p.type==='SP'||p.type==='RP') &&
+    !['SP1','SP2','RP1','RP2','P1','P2','P3'].includes(
+      Object.keys(STATE.rosterSlots).find(k => STATE.rosterSlots[k]===p.name)||''
+    )
+  );
+
+  // ── Available pools sorted by HKB ─────────────────────────────────
+  const pool = STATE.players.filter(avail).sort((a,b)=>(b.hkb||0)-(a.hkb||0));
+  const poolSP  = pool.filter(p=>p.type==='SP');
+  const poolRP  = pool.filter(p=>p.type==='RP');
+  const poolH   = pool.filter(p=>p.type==='H');
+
+  // Elite closers: SVH >= threshold + stellar ratios
+  const eliteClosers = poolRP.filter(p =>
+    (p.stat5||0) >= CONSTITUTION.CLOSER_SVH_MIN &&
+    (p.stat2||99) <= CONSTITUTION.CLOSER_ERA_MAX &&
+    (p.stat3||99) <= CONSTITUTION.CLOSER_WHIP_MAX
+  );
+
+  // Aces: top SP by HKB or Pitching+
+  const aces = poolSP.filter(p => (p.hkb||0) >= CONSTITUTION.ACE_HKB_MIN || (p.pitchPlus||0) >= 115);
+
+  // Best dynasty asset overall (win-now: prefer age ≤32 + hkb > 0)
+  const bda = pool.filter(p =>
+    (p.age||99) <= 32 &&
+    (p.hkb||0) > 500 &&
+    !p.prosp
+  )[0] || pool[0];
+
+  const hasAce  = sps.some(p=>(p.hkb||0)>=CONSTITUTION.ACE_HKB_MIN||(p.pitchPlus||0)>=115);
+  const has2SP  = sps.length >= 2;
+  const totalPFlex = CONSTITUTION.PFLEX_SLOTS + CONSTITUTION.RP_SLOTS;
+
+  // ── PRIORITY 1: Force-fill positions empty 2+ picks ───────────────
+  updateGapTracker();
+  const urgentGaps = Object.entries(GAP_TRACKER)
+    .filter(([,count])=>count >= CONSTITUTION.GAP_GRACE_ROUNDS)
+    .sort((a,b)=>b[1]-a[1]);
+
+  for (const [pos] of urgentGaps) {
+    const best = poolH.find(p =>
+      p.pos===pos || p.pos.startsWith(pos+'/') || p.pos.includes('/'+pos));
+    if (best) return {
+      player: best,
+      reason: `⚠️ ${pos} has been empty for ${GAP_TRACKER[pos]} picks — costing you categories every week. Non-negotiable fill.`,
+      tag: `FILL ${pos}`,
+      color: 'var(--red)',
+    };
+  }
+
+  // ── PRIORITY 2: Ace SP if none secured ────────────────────────────
+  if (!hasAce && aces.length && round <= 8) return {
+    player: aces[0],
+    reason: `No ace SP secured yet. ${aces[0].name} has elite stuff${aces[0].pitchPlus ? ` (Pitch+ ${aces[0].pitchPlus})` : ''}. SPs with this upside disappear fast.`,
+    tag: 'ACE SP',
+    color: 'var(--purple)',
+  };
+
+  // ── PRIORITY 3: Elite closer if P-flex not filled ─────────────────
+  // Don't take closers if all 5 RP/P-flex slots full
+  // Don't take closers that would end up on bench
+  if (closersFilled < totalPFlex && eliteClosers.length && round >= 5) {
+    const cl = eliteClosers[0];
+    return {
+      player: cl,
+      reason: `P-flex slot open (${closersFilled}/${totalPFlex} SV+H arms). ${cl.name}: ${cl.stat5} SVH proj, ${cl.stat2?.toFixed(2)||'—'} ERA, ${cl.stat3?.toFixed(3)||'—'} WHIP — stellar ratios.`,
+      tag: `P-FLEX SV+H`,
+      color: 'var(--green)',
+    };
+  }
+
+  // ── PRIORITY 4: Best dynasty asset (win-now filtered) ─────────────
+  // Skip if it's a pitcher that would go to bench
+  // Skip if it's a prospect and we already have MAX_PROSPECTS
+  // Skip age 35+ before round 20
+  const eligible = pool.filter(p => {
+    if (p.prosp && prospects.length >= CONSTITUTION.MAX_PROSPECTS) return false;
+    if ((p.age||0) >= 35 && round < 20) return false;
+    if ((p.type==='RP') && closersFilled >= totalPFlex) return false;
+    if ((p.type==='SP') && has2SP && hasAce) return false; // don't over-SP early
+    return true;
+  });
+
+  const topEligible = eligible.filter(p=>(p.age||99)<=32&&(p.hkb||0)>500&&!p.prosp)[0]
+    || eligible[0];
+
+  if (topEligible) {
+    const isYoung = (topEligible.age||99) <= 24;
+    const ageNote = isYoung ? ` Age ${topEligible.age} — dynasty window 8+ years.` : '';
+    const hkbNote = topEligible.hkb ? ` HKB ${fmtK(topEligible.hkb)}.` : '';
+    const dynNote = topEligible.dynZ ? ` DYN Z ${fmtN(topEligible.dynZ,3)}.` : '';
+    return {
+      player: topEligible,
+      reason: `Best available dynasty asset.${hkbNote}${dynNote}${ageNote}`,
+      tag: 'BDA',
+      color: 'var(--accent)',
+    };
+  }
+
+  // ── PRIORITY 5: Second SP if only 1 ───────────────────────────────
+  if (!has2SP && poolSP.length) return {
+    player: poolSP[0],
+    reason: `Only 1 SP drafted. Need a second arm for your SP2 slot. ${poolSP[0].name} is the best available.`,
+    tag: 'SP DEPTH',
+    color: 'var(--purple)',
+  };
+
+  // ── PRIORITY 6: Prospect stash (rounds 12+ only, if NA slot open) ─
+  if (prospects.length < CONSTITUTION.MAX_PROSPECTS && round >= 12 && !STATE.rosterSlots['NA'] && pool.filter(p=>p.prosp).length) {
+    const p = pool.filter(p=>p.prosp)[0];
+    return {
+      player: p,
+      reason: `NA slot is open and ${p.name} (age ${p.age}) is the best available prospect stash. Dynasty upside pick.`,
+      tag: 'NA STASH',
+      color: 'var(--purple)',
+    };
+  }
+
+  // Fallback: best available anything
+  return pool[0] ? {
+    player: pool[0],
+    reason: `Best available player remaining on the board.`,
+    tag: 'BPA',
+    color: 'var(--text-dim)',
+  } : null;
+}
+
+function renderTakeCard() {
+  const card = document.getElementById('takeCard');
+  if (!card) return;
+  const myTurn = isMyPick(STATE.currentPick);
+  if (!myTurn || !STATE.players.length) {
+    card.classList.remove('visible');
+    return;
+  }
+  const rec = getTakeRecommendation();
+  if (!rec) { card.classList.remove('visible'); return; }
+
+  const p = rec.player;
+  const meta = document.getElementById('takeMeta');
+  const nameEl = document.getElementById('takePlayerName');
+  const reasonEl = document.getElementById('takeReason');
+  const btn = document.getElementById('takeBtn');
+
+  if (meta) meta.innerHTML = `
+    ${posPill(p.pos)}
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;padding:2px 8px;
+      border-radius:10px;background:rgba(0,0,0,0.3);border:1px solid ${rec.color};
+      color:${rec.color};font-weight:600">${rec.tag}</span>
+    ${p.team ? `<span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--text-muted)">${p.team}</span>` : ''}
+    ${p.age ? `<span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--text-muted)">age ${p.age}</span>` : ''}
+    ${p.hkb ? `<span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--purple);font-weight:600">HKB ${fmtK(p.hkb)}</span>` : ''}
+  `;
+  if (nameEl) { nameEl.textContent = p.name; nameEl.style.color = rec.color; }
+  if (reasonEl) reasonEl.textContent = rec.reason;
+  if (btn) btn.dataset.playerName = p.name;
+  card.classList.add('visible');
+}
+
+function executeTake() {
+  const btn = document.getElementById('takeBtn');
+  if (!btn || !btn.dataset.playerName) return;
+  const name = btn.dataset.playerName;
+  if (STATE.players.find(p=>p.name===name)) {
+    draftPlayer(name);
+    // Scroll to the drafted player row briefly
+    const row = document.getElementById('row-' + name.replace(/[^a-z0-9]/gi,'_'));
+    if (row) row.scrollIntoView({ behavior:'smooth', block:'center' });
+  }
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -2173,7 +2426,8 @@ function renderAll() {
   renderPlayerTable();
   renderPickPanel();
   renderAdviceBar();
-  if (STATE.activeTab === 'my-roster')     renderMyRoster();
+  renderTakeCard();
+  if (STATE.activeTab === 'my-roster')      renderMyRoster();
   if (STATE.activeTab === 'trade-analyzer') renderTradeAnalyzer();
 }
 
