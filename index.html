@@ -1691,13 +1691,24 @@ function getTakeRecommendation() {
     if (p.type==='SP' && spFull) return false;
     return true;
   });
-  const bda = bdaPool.filter(p=>(p.age||99)<=32&&(p.hkb||0)>500&&!p.prosp)[0]||bdaPool[0];
+  // BDA: allow elite prospects (HKB ≥ 4k) if prospect slot is open.
+  // Low-value prospects (<4k HKB) are excluded from BDA —
+  // they belong in the NA stash logic, not as primary picks.
+  // The MAX_PROSPECTS cap is already enforced in bdaPool above.
+  const ELITE_PROSP_HKB = 4000;
+  const bda = bdaPool
+    .filter(p => (p.age||99)<=32 && (p.hkb||0)>500 &&
+      (!p.prosp || (p.hkb||0) >= ELITE_PROSP_HKB)
+    )
+    .sort((a,b) => (b.hkb||0)-(a.hkb||0))[0]
+    || bdaPool[0];
 
   // ── PRIORITY 0: Round 1 — always best elite hitter, never SP ─────
   // In round 1 your pick is too valuable to spend on a pitcher.
   // The dynasty window on a 25-year-old hitter outlasts any SP.
   if (round === 1) {
-    const eliteH = bdaPool.filter(p=>p.type==='H'&&(p.hkb||0)>=4000&&!p.prosp)[0]
+    const eliteH = bdaPool.filter(p=>p.type==='H'&&(p.hkb||0)>=4000&&
+      (!p.prosp||(p.hkb||0)>=ELITE_PROSP_HKB))[0]
                 || bdaPool.filter(p=>p.type==='H'&&!p.prosp)[0];
     if (eliteH) return {
       player:eliteH, tag:'R1 · BDA', color:'var(--accent)',
@@ -1753,12 +1764,14 @@ function getTakeRecommendation() {
   // WIN-NOW mode:  sort by HKB  (market value — values contributors)
   // This is what the toggle actually changes.
   if (bda) {
-    // Re-sort BDA pool by mode
-    const sortedBDA = [...bdaPool].sort((a,b) =>
-      STATE.winNow
-        ? (b.hkb||0)  - (a.hkb||0)    // win-now: market value
-        : (b.dynZ||0) - (a.dynZ||0)    // dynasty: age-weighted model
-    ).filter(p => p.type !== 'SP' || !spFull);
+    // Re-sort BDA pool by mode, allowing elite prospects (HKB ≥ 4k)
+    const sortedBDA = [...bdaPool]
+      .filter(p => !p.prosp || (p.hkb||0) >= ELITE_PROSP_HKB)
+      .sort((a,b) =>
+        STATE.winNow
+          ? (b.hkb||0)  - (a.hkb||0)    // win-now: market value
+          : (b.dynZ||0) - (a.dynZ||0)    // dynasty: age-weighted model
+      ).filter(p => p.type !== 'SP' || !spFull);
 
     const pick = sortedBDA[0] || bda;
     if (pick.type==='SP' && spFull) {
