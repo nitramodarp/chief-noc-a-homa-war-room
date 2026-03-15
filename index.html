@@ -1987,6 +1987,11 @@ async function fetchPlayers() {
     for (const p of players) {
       p.hkb = p.sheetHKB > 0 ? p.sheetHKB : lookupHKB(p.name);
       p.ciely = lookupCiely(p.name);
+      // Flag banned players — zero out value so they never surface in recommendations
+      if (isBanned(p.name)) {
+        p.hkb = 0; p.dynZ = -99; p.rawZ = -99; p.ciely = 0;
+        p.flag = 'BANNED'; p.notes = '⛔ Banned/Suspended — do not draft';
+      }
     }
 
     // ── INJECT ENO DATA FIRST (needed for Pitching+ multiplier) ───────
@@ -2545,7 +2550,19 @@ const CONSTITUTION = {
 };
 
 // ════════════════════════════════════════════════════════════════════
-// POSITIONAL URGENCY THRESHOLDS — round-based, not pick-count based
+// BANNED PLAYERS — never recommend, zero out value, flag on board
+// Add players here who are suspended, banned, or effectively done
+// (gambling investigations, lifetime bans, career-ending situations)
+// ════════════════════════════════════════════════════════════════════
+const BANNED_PLAYERS = new Set([
+  'emmanuel clase',   // Federal indictment — rigging pitches for gamblers. Likely never pitches again.
+  'luis ortiz',       // Same investigation as Clase — co-indicted.
+]);
+
+function isBanned(name) {
+  return BANNED_PLAYERS.has(cleanName(name));
+}
+
 // Each position has a WARN round and a FORCE round.
 // WARN  = advice bar starts flagging it (yellow/orange)
 // FORCE = TAKE engine overrides BDA and fills it immediately (red)
@@ -2565,7 +2582,7 @@ function getPosGaps() {
   // Returns array of {pos, urgency:'warn'|'force', best} sorted by urgency
   const my = STATE.myDrafted;
   const round = getRound();
-  const avail = p => !STATE.drafted.has(p.name);
+  const avail = p => !STATE.drafted.has(p.name) && !isBanned(p.name);
   const noPros = p => !p.prosp && (p.hkb||0) >= 500;
 
   const has = pos => my.some(p => p.pos===pos||p.pos.startsWith(pos+'/')||p.pos.includes('/'+pos));
@@ -2610,7 +2627,7 @@ function getTakeRecommendation() {
   if (!STATE.players.length) return null;
   const my    = STATE.myDrafted;
   const round = getRound();
-  const avail = p => !STATE.drafted.has(p.name) && !p.name.includes('(SP)');
+  const avail = p => !STATE.drafted.has(p.name) && !isBanned(p.name) && !p.name.includes('(SP)');
   const C = CONSTITUTION;
 
   // ── Roster counts ─────────────────────────────────────────────────
@@ -2882,7 +2899,7 @@ function getWarRoomAdvice() {
   const my = STATE.myDrafted;
   const round = getRound();
   const winNow = STATE.winNow;
-  const avail = p => !STATE.drafted.has(p.name);
+  const avail = p => !STATE.drafted.has(p.name) && !isBanned(p.name);
   const advices = [];
 
   // ── Roster inventory ─────────────────────────────────────────────
