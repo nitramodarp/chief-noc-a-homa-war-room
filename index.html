@@ -160,7 +160,7 @@
   /* FILTERS */
   .filter-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; align-items: center; }
   .filter-btn {
-    padding: 4px 12px; font-family: 'IBM Plex Mono', monospace; font-size: 9px;
+    padding: 5px 14px; font-family: 'IBM Plex Mono', monospace; font-size: 10px;
     font-weight: 500; letter-spacing: 0.5px;
     border: 1px solid var(--border); border-radius: 20px; cursor: pointer;
     background: var(--surface2); color: var(--text-muted); transition: all 0.15s;
@@ -174,17 +174,17 @@
   .search-input {
     width: 100%; background: var(--surface3); border: 1px solid var(--border);
     border-radius: 8px; color: var(--text); font-family: 'IBM Plex Sans', sans-serif;
-    font-size: 13px; padding: 8px 14px; outline: none; transition: border-color 0.2s;
+    font-size: 14px; padding: 10px 14px; outline: none; transition: border-color 0.2s;
   }
   .search-input:focus { border-color: var(--accent); }
   .search-input::placeholder { color: var(--text-muted); }
 
   /* TABLE */
   .table-wrap { overflow-x: auto; overflow-y: auto; max-height: calc(100vh - 310px); }
-  .data-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
   .data-table th {
-    font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: 1px;
-    text-transform: uppercase; color: var(--text-muted); padding: 8px 10px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 1px;
+    text-transform: uppercase; color: var(--text-muted); padding: 9px 10px;
     text-align: left; border-bottom: 1px solid var(--border);
     white-space: nowrap; cursor: pointer; user-select: none;
     position: sticky; top: 0; background: var(--surface); z-index: 2;
@@ -193,7 +193,7 @@
   .data-table th:hover { color: var(--accent); }
   .data-table th.sorted { color: var(--accent); }
   .data-table th.sorted::after { content: attr(data-dir); margin-left: 4px; font-size: 8px; }
-  .data-table td { padding: 7px 10px; border-bottom: 1px solid rgba(46,46,74,0.35); vertical-align: middle; }
+  .data-table td { padding: 9px 10px; border-bottom: 1px solid rgba(46,46,74,0.35); vertical-align: middle; }
   .data-table tr:hover td { background: var(--surface2); }
   .data-table tr.drafted-row td { opacity: 0.28; }
   .data-table tr.my-drafted-row td { background: rgba(0,212,255,0.04); }
@@ -202,8 +202,8 @@
 
   /* POSITION PILLS */
   .pos-pill {
-    display: inline-block; padding: 2px 6px; border-radius: 4px;
-    font-family: 'IBM Plex Mono', monospace; font-size: 9px; font-weight: 600;
+    display: inline-block; padding: 2px 7px; border-radius: 4px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 600;
     letter-spacing: 0.5px; white-space: nowrap;
   }
   .pos-C    { background: rgba(0,212,255,0.15);  color: #00d4ff; }
@@ -391,6 +391,9 @@
       <!-- LEFT: Player Board -->
       <div>
         <div class="panel" style="margin-bottom:0">
+          <!-- WAR ROOM ADVICE BAR -->
+          <div id="adviceBar" style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap"></div>
+
           <div class="filter-row" id="filterBtns">
             <button class="filter-btn active" onclick="setFilter('ALL',this)">All</button>
             <button class="filter-btn" onclick="setFilter('H',this)">Hitters</button>
@@ -515,10 +518,19 @@
   <div class="tab-content" id="tab-trade-analyzer">
     <div class="panel">
       <div class="panel-title">⚖️ TRADE ANALYZER</div>
-      <div style="font-size:11px;color:var(--text-muted);margin-bottom:14px;font-family:'IBM Plex Mono',monospace;line-height:1.7">
-        Compare trade value using both signals: <span style="color:var(--green)">DYN Z</span> = our model (your league cats + age) &nbsp;|&nbsp;
-        <span style="color:var(--purple)">HKB</span> = market value (50k+ managers) &nbsp;|&nbsp;
-        <span style="color:var(--accent)">DELTA</span> = where they diverge = your edge
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;padding:14px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)">
+        <div style="text-align:center">
+          <div style="font-family:'Bebas Neue',cursive;font-size:18px;color:var(--green);letter-spacing:2px">DYN Z</div>
+          <div style="font-size:11px;color:var(--text-dim);margin-top:4px;line-height:1.5">Our model score.<br>Your league's exact categories<br>+ age multiplier.</div>
+        </div>
+        <div style="text-align:center;border-left:1px solid var(--border);border-right:1px solid var(--border)">
+          <div style="font-family:'Bebas Neue',cursive;font-size:18px;color:var(--purple);letter-spacing:2px">HKB</div>
+          <div style="font-size:11px;color:var(--text-dim);margin-top:4px;line-height:1.5">Market price.<br>50,000+ dynasty managers<br>voting in real time.</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-family:'Bebas Neue',cursive;font-size:18px;color:var(--accent);letter-spacing:2px">DELTA</div>
+          <div style="font-size:11px;color:var(--text-dim);margin-top:4px;line-height:1.5">Where they diverge.<br><span style="color:var(--green)">▲ GREEN = market sleeping on them.</span><br><span style="color:var(--red)">▼ RED = market overpaying.</span></div>
+        </div>
       </div>
       <div class="trade-grid">
         <div class="trade-side">
@@ -683,7 +695,24 @@ const HKB_RAW = {
 };
 
 // ════════════════════════════════════════════════════════════════════
-// ROSTER SLOTS
+// KNOWN PROSPECTS — whitelist overrides sheet PROSP column
+// prevents false positives from ⚠️ flag being truthy
+// ════════════════════════════════════════════════════════════════════
+const KNOWN_PROSPECTS = new Set([
+  'konnor griffin','roman anthony','kevin mcgonigle','samuel basallo',
+  'colt emerson','druw jones','dylan crews','colson montgomery',
+  'max clark','zac veen','enrique bradfield jr','jacob wilson',
+  'orelvis martinez','cam mclean','thomas white','andrew painter',
+  'jackson jobe','trey yesavage','noble meyer','luis de leon',
+  'ben joyce','orion kerkering','jesus made','leo de vries',
+  'jj wetherholt','jackson holliday','coby mayo','evan carter',
+  'cam collier','walker jenkins','aidan miller','chase davis',
+  'brooks lee','jordan lawlar','max anderson','gavin cross',
+  'tanner schobel','ronny mauricio','brainer bonaci','heston kjerstad',
+  'jose salas','brice matthews','gavin williams','dylan lesko',
+  'jacob misiorowski','chase dollander','jurrangelo cijntje',
+  'aj sloan','bryce rainer','colt emerson',
+]);
 // ════════════════════════════════════════════════════════════════════
 const ROSTER_SLOTS = [
   {id:'C',   label:'C',      posTypes:['C'],             cls:''},
@@ -721,8 +750,8 @@ const ROSTER_SLOTS = [
 // ════════════════════════════════════════════════════════════════════
 const STATE = {
   players: [],
-  sortCol: 'ovrRk',
-  sortDir: 1,
+  sortCol: 'hkb',
+  sortDir: -1,
   filter: 'ALL',
   search: '',
   hideDrafted: false,
@@ -878,12 +907,29 @@ async function fetchPlayers() {
         dynZ:   pf(cols[18]),
         poolRk: pi(cols[19]),
         ovrRk:  pi(cols[20]),
-        prosp:  (cols[21] || '').trim() === '✓',
+        prosp:  KNOWN_PROSPECTS.has(cleanName(name)),
         flag:   (cols[22] || '').trim(),
         notes:  (cols[23] || '').trim(),
         hkb: 0, hkbRank: 0, dynRank: 0, delta: 0,
       });
     }
+
+    // ── OHTANI DUAL ENTRY ─────────────────────────────────────────────
+    // Sheet has him as DH hitter. Inject a synthetic SP entry for his
+    // pitching value — returning to mound in 2026 after 2024-25 DH only.
+    const ohtaniH = players.find(p => cleanName(p.name) === 'shohei ohtani');
+    if (ohtaniH) {
+      players.push({
+        ...ohtaniH,
+        pos: 'SP',
+        type: 'SP',
+        name: 'Shohei Ohtani (SP)',
+        stat1: 165, stat2: 2.85, stat3: 1.02, stat4: 20, stat5: 0,
+        notes: 'Pitching return 2026 — DH entry ranked separately',
+        hkb: 0, hkbRank: 0, dynRank: 0, delta: 0,
+      });
+    }
+    // ─────────────────────────────────────────────────────────────────
 
     setProgress(55, 'COMPUTING DELTA RANKINGS...');
 
@@ -1016,26 +1062,26 @@ function renderPlayerTable() {
       : `<button class="draft-btn${myTurn ? ' my-turn' : ''}" onclick="draftPlayer('${esc(p.name)}')">${myTurn ? '◀ MINE' : 'DRAFT'}</button>`;
 
     html += `<tr class="${rowCls}" id="row-${p.name.replace(/[^a-z0-9]/gi,'_')}">
-      <td class="mono" style="font-size:10px;color:var(--text-muted)">${p.ovrRk || '—'}</td>
+      <td class="mono" style="font-size:11px;color:var(--text-muted);font-weight:600">${p.ovrRk || '—'}</td>
       <td>
-        <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
           ${posPill(p.pos)}
-          <span style="font-weight:500;font-size:12px">${p.name}</span>
+          <span style="font-weight:600;font-size:14px;color:var(--text)">${p.name}</span>
           ${nameExtra}${flagExtra}
         </div>
-        <div style="margin-top:2px;display:flex;align-items:center;gap:4px">
+        <div style="margin-top:3px;display:flex;align-items:center;gap:5px">
           <span class="badge badge-${arch.cls}">${arch.label}</span>
-          <span class="mono" style="font-size:8px;color:var(--text-muted)">#${p.poolRk||'—'} pool</span>
+          <span class="mono" style="font-size:9px;color:var(--text-muted)">#${p.poolRk||'—'} pool</span>
         </div>
       </td>
-      <td class="mono" style="font-size:11px;color:${ageColor};font-weight:600">${p.age || '—'}</td>
-      <td class="mono" style="font-size:10px;color:var(--text-dim)">${p.team || '—'}</td>
+      <td class="mono" style="font-size:13px;color:${ageColor};font-weight:700">${p.age || '—'}</td>
+      <td class="mono" style="font-size:11px;color:var(--text-dim)">${p.team || '—'}</td>
       <td>${p.type === 'SP' ? '<span class="badge badge-aging">SP</span>' : p.type === 'RP' ? '<span class="badge badge-sell">RP</span>' : '<span class="badge badge-young">H</span>'}</td>
-      <td class="mono" style="font-size:9px;color:var(--text-muted);white-space:nowrap">${statLine(p)}</td>
-      <td class="mono" style="font-size:12px;color:${dynColor};font-weight:600">${p.dynZ !== null ? fmtN(p.dynZ, 3) : '—'}</td>
-      <td class="mono" style="font-size:11px;color:var(--purple)">${p.hkb > 0 ? fmtK(p.hkb) : '—'}</td>
-      <td class="mono ${delta !== null ? deltaClass(delta) : ''}" style="font-size:10px;font-weight:600" title="HKB rank: ${p.hkbRank} | DYN rank: ${p.dynRank}">${delta !== null ? deltaLabel(delta) : '—'}</td>
-      <td style="font-size:9px;color:var(--text-muted);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${p.notes}">${p.notes || ''}</td>
+      <td class="mono" style="font-size:10px;color:var(--text-dim);white-space:nowrap">${statLine(p)}</td>
+      <td class="mono" style="font-size:13px;color:${dynColor};font-weight:700">${p.dynZ !== null ? fmtN(p.dynZ, 3) : '—'}</td>
+      <td class="mono" style="font-size:13px;color:var(--purple);font-weight:600">${p.hkb > 0 ? fmtK(p.hkb) : '—'}</td>
+      <td class="mono ${delta !== null ? deltaClass(delta) : ''}" style="font-size:11px;font-weight:700" title="HKB rank: ${p.hkbRank} | DYN rank: ${p.dynRank}">${delta !== null ? deltaLabel(delta) : '—'}</td>
+      <td style="font-size:10px;color:var(--text-dim);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${p.notes}">${p.notes || ''}</td>
       <td>${draftHtml}</td>
     </tr>`;
   }
@@ -1252,7 +1298,86 @@ function autoAssignSlot(player) {
 }
 
 // ════════════════════════════════════════════════════════════════════
-// WAIVERS
+// WAR ROOM ADVICE ENGINE
+// ════════════════════════════════════════════════════════════════════
+function getWarRoomAdvice() {
+  const my = STATE.myDrafted;
+  const round = getRound();
+  const avail = p => !STATE.drafted.has(p.name);
+
+  if (!my.length) {
+    const topAvail = STATE.players.filter(avail).sort((a,b) => (b.hkb||0)-(a.hkb||0));
+    const topName = topAvail[0] ? topAvail[0].name : '—';
+    return [{ color:'var(--accent)', icon:'🎯', msg:`PICK 8 — Board falls to you soon. Best available: ${topName}` }];
+  }
+
+  const advices = [];
+  const sps       = my.filter(p => p.type === 'SP');
+  const rps       = my.filter(p => p.type === 'RP');
+  const hitters   = my.filter(p => p.type === 'H');
+  const hasAce    = sps.some(p => (p.dynZ||0) > 0.5 || (p.hkb||0) >= 4000);
+  const eliteRPs  = rps.filter(p => (p.stat5||0) >= 35);
+  const hasC      = my.some(p => p.pos === 'C');
+  const hasSS     = my.some(p => p.pos === 'SS' || p.pos.startsWith('SS/'));
+  const has2B     = my.some(p => ['2B','2B/SS','SS/2B'].some(x => p.pos === x || p.pos.startsWith('2B/')));
+  const ofCount   = my.filter(p => p.pos === 'OF' || p.pos.startsWith('OF/')).length;
+  const availSPs  = STATE.players.filter(p => p.type==='SP' && avail(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0));
+  const availRPs  = STATE.players.filter(p => p.type==='RP' && avail(p) && (p.stat5||0)>=35).sort((a,b)=>(b.hkb||0)-(a.hkb||0));
+  const availC    = STATE.players.filter(p => p.pos==='C' && avail(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0));
+  const availSS   = STATE.players.filter(p => (p.pos==='SS'||p.pos.startsWith('SS/')) && avail(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0));
+
+  // MUST-ACT alerts (red)
+  if (!hasAce && round >= 3 && availSPs.length) {
+    advices.push({ color:'var(--red)', icon:'🚨', msg:`SECURE AN ACE — No elite SP yet. Best available: ${availSPs[0].name}` });
+  }
+  if (!hasC && round >= 8 && availC.length) {
+    advices.push({ color:'var(--red)', icon:'🚨', msg:`CATCHER SCARCITY — Drying up fast. Best available: ${availC[0].name}` });
+  }
+
+  // SHOULD-ACT alerts (orange/yellow)
+  if (!hasSS && round >= 5 && availSS.length) {
+    advices.push({ color:'var(--orange)', icon:'⚠️', msg:`NO SHORTSTOP — Thinnest position. Consider: ${availSS[0].name}` });
+  }
+  if (eliteRPs.length < 2 && round >= 8 && availRPs.length) {
+    const need = 2 - eliteRPs.length;
+    advices.push({ color:'var(--green)', icon:'🔒', msg:`P-FLEX CLOSERS — Need ${need} more SV+H arm${need>1?'s':''}. Best available: ${availRPs[0].name} (${availRPs[0].stat5} SVH)` });
+  }
+  if (ofCount < 2 && round >= 6) {
+    advices.push({ color:'var(--yellow)', icon:'🏃', msg:`OUTFIELD THIN — Only ${ofCount}/3 OF spots filled.` });
+  }
+  if (sps.length < 2 && round >= 5 && availSPs.length) {
+    advices.push({ color:'var(--purple)', icon:'💪', msg:`ROTATION EMPTY — Need 2 SPs minimum. Best available: ${availSPs[0].name}` });
+  }
+
+  // POSITIVE reinforcement (green)
+  if (hasAce && sps.length >= 2) {
+    advices.push({ color:'var(--green)', icon:'✅', msg:'ROTATION LOCKED — 2 SPs secured. Focus on hitters + closers.' });
+  }
+  if (eliteRPs.length >= 2) {
+    advices.push({ color:'var(--green)', icon:'✅', msg:`P-FLEX SET — ${eliteRPs.length} closer${eliteRPs.length>1?'s':''} locked for SV+H dominance.` });
+  }
+
+  if (!advices.length) {
+    const topAvailHitter = STATE.players.filter(p=>p.type==='H'&&avail(p)).sort((a,b)=>(b.hkb||0)-(a.hkb||0))[0];
+    advices.push({ color:'var(--accent)', icon:'🎯', msg:`BEST AVAILABLE HITTER: ${topAvailHitter?.name||'—'} — Roster shaping up well.` });
+  }
+
+  return advices.slice(0, 2);
+}
+
+function renderAdviceBar() {
+  const bar = document.getElementById('adviceBar');
+  if (!bar) return;
+  const advices = getWarRoomAdvice();
+  bar.innerHTML = advices.map(a =>
+    `<div style="display:flex;align-items:center;gap:8px;padding:8px 14px;background:var(--surface2);border-radius:8px;border-left:3px solid ${a.color};flex:1;min-width:0">
+      <span style="font-size:16px;flex-shrink:0">${a.icon}</span>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:${a.color};font-weight:600;letter-spacing:0.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${a.msg}</span>
+    </div>`
+  ).join('');
+}
+
+
 // ════════════════════════════════════════════════════════════════════
 function setWaiverFilter(f, btn) {
   STATE.waiverFilter = f;
@@ -1459,6 +1584,7 @@ function setProgress(pct, msg) {
 function renderAll() {
   renderPlayerTable();
   renderPickPanel();
+  renderAdviceBar();
   if (STATE.activeTab === 'my-roster')     renderMyRoster();
   if (STATE.activeTab === 'trade-analyzer') renderTradeAnalyzer();
 }
