@@ -422,7 +422,7 @@
                   <th>TEAM</th>
                   <th title="Type: H=Hitter, SP=Starter, RP=Reliever">TYPE</th>
                   <th title="Key projected stats">STAT LINE</th>
-                  <th onclick="setSort('pitchPlus')" data-col="pitchPlus" title="Eno Sarris Pitching+ — pitchers only. 100=average, 115+=elite. Combines Stuff+ and Location+.">PITCH+</th>
+                  <th onclick="setSort('pitchPlus')" data-col="pitchPlus" title="Eno Sarris Pitching+ (SPs only). 100=avg, 115+=elite. NOW ADJUSTS DYN Z: ≥118 +12%, ≥110 +5%, ≥103 ±0%, ≥97 -8%, below -15%. ▲/▼ in DYN Z column shows adjustment.">PITCH+</th>
                   <th title="Stuff+ / Location+ / Health — Eno Sarris pitch report. Hover player name for full scouting note." style="min-width:110px">S+ · L+ · HLTH</th>
                   <th onclick="setSort('dynZ')" data-col="dynZ" title="Our model: z-score × age multiplier (your league's categories)">DYN Z</th>
                   <th onclick="setSort('hkb')" data-col="hkb" title="HarryKnowsBall crowdsourced dynasty market value">HKB</th>
@@ -1019,20 +1019,7 @@ async function fetchPlayers() {
     // Inject HKB values
     for (const p of players) p.hkb = lookupHKB(p.name);
 
-    // Rank by dynZ descending
-    const byDyn = [...players].sort((a, b) => (b.dynZ || -99) - (a.dynZ || -99));
-    byDyn.forEach((p, i) => { p.dynRank = i + 1; });
-
-    // Rank by HKB descending — no-HKB players go to the bottom
-    const withHKB    = players.filter(p => p.hkb > 0).sort((a, b) => b.hkb - a.hkb);
-    const withoutHKB = players.filter(p => p.hkb === 0);
-    withHKB.forEach((p, i) => { p.hkbRank = i + 1; });
-    withoutHKB.forEach((p, i) => { p.hkbRank = withHKB.length + i + 1; });
-
-    // Delta: positive = we rank higher than market = BUY opportunity
-    players.forEach(p => { p.delta = p.hkb > 0 ? p.hkbRank - p.dynRank : 0; });
-
-    // ── INJECT ENO DATA ────────────────────────────────────────────────
+    // ── INJECT ENO DATA FIRST (needed for Pitching+ multiplier) ───────
     players.forEach(p => {
       if (p.type === 'SP' || p.type === 'RP') {
         const eno = lookupEno(p.name);
@@ -1047,6 +1034,38 @@ async function fetchPlayers() {
         }
       }
     });
+
+    // ── PITCHING+ MULTIPLIER — applied to SP dynZ before ranking ──────
+    // Eno's Pitching+ is forward-looking (stuff + command).
+    // It catches breakouts and declines the stat projections miss.
+    // Only applied to SPs with a valid Pitching+ score.
+    // Multipliers: ≥118 elite +12%, 110-117 good +5%,
+    //              103-109 average ±0%, 97-102 below -8%, <97 poor -15%
+    players.forEach(p => {
+      if (p.type !== 'SP' || !p.pitchPlus || p.dynZ === null) return;
+      let mult = 1.0;
+      if      (p.pitchPlus >= 118) mult = 1.12;
+      else if (p.pitchPlus >= 110) mult = 1.05;
+      else if (p.pitchPlus >= 103) mult = 1.00;
+      else if (p.pitchPlus >= 97)  mult = 0.92;
+      else                          mult = 0.85;
+      p.dynZRaw   = p.dynZ;        // preserve original for display
+      p.pitchMult = mult;
+      p.dynZ      = p.dynZ * mult;
+    });
+
+    // Rank by dynZ descending (now Pitching+-adjusted for SPs)
+    const byDyn = [...players].sort((a, b) => (b.dynZ || -99) - (a.dynZ || -99));
+    byDyn.forEach((p, i) => { p.dynRank = i + 1; });
+
+    // Rank by HKB descending — no-HKB players go to the bottom
+    const withHKB    = players.filter(p => p.hkb > 0).sort((a, b) => b.hkb - a.hkb);
+    const withoutHKB = players.filter(p => p.hkb === 0);
+    withHKB.forEach((p, i) => { p.hkbRank = i + 1; });
+    withoutHKB.forEach((p, i) => { p.hkbRank = withHKB.length + i + 1; });
+
+    // Delta: positive = we rank higher than market = BUY opportunity
+    players.forEach(p => { p.delta = p.hkb > 0 ? p.hkbRank - p.dynRank : 0; });
 
     STATE.players = players;
     STATE.lastSync = new Date().toLocaleTimeString();
@@ -1193,7 +1212,13 @@ function renderPlayerTable() {
       <td class="mono" style="font-size:10px;color:var(--text-dim);white-space:nowrap">${statLine(p)}</td>
       <td style="white-space:nowrap">${pitchPlusCell}</td>
       <td>${stuffLocHealth}</td>
-      <td class="mono" style="font-size:13px;color:${dynColor};font-weight:700">${p.dynZ !== null ? fmtN(p.dynZ, 3) : '—'}</td>
+      <td class="mono" style="font-size:13px;color:${dynColor};font-weight:700">
+        ${p.dynZ !== null ? fmtN(p.dynZ, 3) : '—'}
+        ${p.pitchMult && p.pitchMult !== 1.0
+          ? `<span style="font-size:8px;margin-left:3px;color:${p.pitchMult>1?'var(--green)':'var(--red)'}">
+              ${p.pitchMult>1?'▲':'▼'}P+</span>`
+          : ''}
+      </td>
       <td class="mono" style="font-size:13px;color:var(--purple);font-weight:600">${p.hkb > 0 ? fmtK(p.hkb) : '—'}</td>
       <td class="mono ${delta !== null ? deltaClass(delta) : ''}" style="font-size:11px;font-weight:700" title="HKB rank: ${p.hkbRank} | DYN rank: ${p.dynRank}">${delta !== null ? deltaLabel(delta) : '—'}</td>
       <td style="font-size:10px;color:var(--text-dim);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${p.notes}">${p.notes || ''}</td>
