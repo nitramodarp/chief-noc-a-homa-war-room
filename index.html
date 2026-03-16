@@ -1740,15 +1740,16 @@ const KNOWN_PROSPECTS = new Set([
   'colt emerson','druw jones','dylan crews','colson montgomery',
   'max clark','zac veen','enrique bradfield jr','jacob wilson',
   'orelvis martinez','cam mclean','thomas white','andrew painter',
-  'jackson jobe','trey yesavage','noble meyer','luis de leon',
-  'ben joyce','orion kerkering','jesus made','leo de vries',
+  'jackson jobe','trey yesavage','noble meyer',
+  // NOTE: ben joyce, orion kerkering removed — MLB-ready arms, eligible for late RP picks
+  'jesus made','leo de vries',
   'jj wetherholt','jackson holliday','coby mayo','evan carter',
   'cam collier','walker jenkins','aidan miller','chase davis',
   'brooks lee','jordan lawlar','max anderson','gavin cross',
   'tanner schobel','ronny mauricio','brainer bonaci','heston kjerstad',
   'jose salas','brice matthews','gavin williams','dylan lesko',
   'jacob misiorowski','chase dollander','jurrangelo cijntje',
-  'aj sloan','bryce rainer','colt emerson',
+  'aj sloan','bryce rainer',
 ]);
 // ════════════════════════════════════════════════════════════════════
 const ROSTER_SLOTS = [
@@ -2559,6 +2560,13 @@ const BANNED_PLAYERS = new Set([
   'luis ortiz',       // Same investigation as Clase — co-indicted.
 ]);
 
+// Low-value RPs to suppress from closer recommendations
+// These have low SVH projections but may still appear via solidRP fallback
+const SUPPRESSED_CLOSERS = new Set([
+  'jordan romano',    // Health risk, 10 SVH projection — not a true SV+H asset
+  'raisel iglesias',  // LAA, aging, declining role
+]);
+
 function isBanned(name) {
   return BANNED_PLAYERS.has(cleanName(name));
 }
@@ -2676,11 +2684,15 @@ function getTakeRecommendation() {
   // Quality sub-pools
   const aces    = poolSP.filter(p=>(p.hkb||0)>=C.ACE_HKB_MIN||(p.pitchPlus||0)>=C.ACE_PITCH_PLUS);
   const eliteRP = poolRP.filter(p=>
+    !SUPPRESSED_CLOSERS.has(cleanName(p.name)) &&
     (p.stat5||0)>=C.CLOSER_SVH_MIN &&
     (p.stat2||99)<=C.CLOSER_ERA_MAX &&
     (p.stat3||99)<=C.CLOSER_WHIP_MAX
   );
-  const solidRP = poolRP.filter(p=>(p.stat5||0)>=C.CLOSER_SVH_MIN);
+  const solidRP = poolRP.filter(p=>
+    !SUPPRESSED_CLOSERS.has(cleanName(p.name)) &&
+    (p.stat5||0)>=C.CLOSER_SVH_MIN
+  );
 
   // BDA pool — win-now filtered, no bench violations
   const bdaPool = pool.filter(p=>{
