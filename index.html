@@ -505,7 +505,7 @@
   <div class="header-left">
     <div>
       <div class="header-logo">⚾ Chief Noc-A-Homa</div>
-      <div class="header-meta">DYNASTY BASEBALL · 2026 WAR ROOM · YAHOO · 12 TEAMS · SNAKE · PICK 8 · 30-MAN ROSTER</div>
+      <div class="header-meta">DYNASTY BASEBALL · 2026 WAR ROOM · YAHOO · 12 TEAMS · SNAKE · PICK 8 · 20 ROUNDS · 30-MAN ROSTER</div>
     </div>
   </div>
   <div class="header-right">
@@ -827,7 +827,7 @@ const CONFIG = {
 // ════════════════════════════════════════════════════════════════════
 const SNAKE_PICKS = (function() {
   const picks = [];
-  for (let r = 1; r <= 23; r++) {
+  for (let r = 1; r <= 20; r++) {
     const overall = r % 2 === 1
       ? (r - 1) * 12 + 8
       : r * 12 - 7;
@@ -2247,7 +2247,7 @@ function renderPickPanel() {
   // Stat cards
   const avail = STATE.players.filter(p => !STATE.drafted.has(p.name)).length;
   if (g('sc-drafted')) g('sc-drafted').textContent = STATE.drafted.size;
-  if (g('sc-mypicks')) g('sc-mypicks').textContent = STATE.myDrafted.length + '/23';
+  if (g('sc-mypicks')) g('sc-mypicks').textContent = STATE.myDrafted.length + '/20';
   if (g('sc-avail'))   g('sc-avail').textContent   = avail;
   if (g('sc-round'))   g('sc-round').textContent   = getRound();
 
@@ -2547,10 +2547,10 @@ const CONSTITUTION = {
   // Prospects — 5 NA slots, start stashing round 13
   MAX_PROSPECTS:      5,
   PROSPECT_AGE_MAX:   22,
-  PROSPECT_RD_MIN:    13,   // start stashing prospects round 13 (5 slots to fill)
+  PROSPECT_RD_MIN:    12,   // start stashing prospects round 12 (5 slots, 20-round draft)
   // General
   VET_AGE_CUTOFF:     35,   // avoid 35+ before round 20
-  VET_ROUND_MIN:      20,
+  VET_ROUND_MIN:      17,   // avoid 35+ before round 17 (adjusted for 20-round draft)
   GAP_GRACE_PICKS:    2,
 };
 
@@ -3170,7 +3170,7 @@ function getWarRoomAdvice() {
   // ══════════════════════════════════════════════════════════════════
   // ROUNDS 16–23 — Lottery. Age ≤23 only. No old vets.
   // ══════════════════════════════════════════════════════════════════
-  if (round <= 23) {
+  if (round <= 20) {
     const closersNeeded = Math.max(0, 6 - closers.length);
     if (!has1B && A.c1B.length)
       advices.push({ color:'var(--red)', icon:'🚨',
