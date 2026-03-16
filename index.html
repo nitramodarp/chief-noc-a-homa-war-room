@@ -2752,15 +2752,52 @@ function getTakeRecommendation() {
     // Otherwise fall through to BDA — franchise hitter takes priority
   }
 
-  // ── PRIORITY 3: BDA value check — franchise players override closer
+  // ── PRIORITY 2.5: SP URGENCY — force SP depth when critically short ──
+  // If we have only 1 SP and it's past round 8, SP2 is an emergency.
+  // If we have only 1-2 SPs and it's past round 12, force SP before BDA.
+  // SP pool: quality arms only (HKB ≥ 400 or DYN Z > 0)
+  const qualitySP = poolSP.filter(p => (p.hkb||0) >= 400 || (p.dynZ||0) > 0);
+  if (qualitySP.length) {
+    const spNeeded = C.SP_TOTAL - spCount; // how many SPs still needed
+    const spBdaHKB = bda?.hkb || 0;
+    const spTopHKB = qualitySP[0]?.hkb || 0;
+
+    // Force SP if critically short and round thresholds exceeded
+    const forceSP = (
+      (spCount < 2 && round >= 9)  ||  // only 1 SP past round 9 — emergency
+      (spCount < 3 && round >= 13) ||  // only 2 SPs past round 13
+      (spCount < 4 && round >= 17)     // only 3 SPs past round 17
+    );
+
+    if (forceSP) {
+      // Only override BDA if SP value is within reasonable range (not worth 3× more)
+      if (!bda || bda.type === 'SP' || spBdaHKB < spTopHKB * 3.0) {
+        return {
+          player: qualitySP[0], tag: `SP #${spCount+1}`, color: 'var(--purple)',
+          reason: `Only ${spCount}/${C.SP_TOTAL} SPs in round ${round} — ${spNeeded} more needed. SP depth dries up fast. ${qualitySP[0].name} · HKB ${fmtK(spTopHKB)}.`,
+        };
+      }
+    }
+  }
+  // ── PRIORITY 3: Value checks for closer vs BDA vs SP ─────────────
   // Key rule: NEVER recommend a closer over a player with 2× its HKB.
-  // Clay Holmes (1.7k) should never beat Roman Anthony (6.3k).
-  // Closer hunting starts only when BDA value drops to closer range.
+  // Also: nudge toward SP2 before closer hunting if only 1 SP and value is close.
   const bdaHKB   = bda?.hkb || 0;
   const bestCL   = !rpFull ? eliteRP[0] : null;
   const clHKB    = bestCL?.hkb || 0;
-  const valueMult = STATE.winNow ? 1.8 : 2.5; // win-now is less patient
+  const valueMult = STATE.winNow ? 1.8 : 2.5;
   const closerOverridden = bestCL && bdaHKB >= clHKB * valueMult;
+
+  // Nudge to SP2 before closer if only 1 SP and SP value is reasonable
+  if (!hasSP2 && qualitySP.length && round >= 6) {
+    const spHKB = qualitySP[0]?.hkb || 0;
+    if (!bestCL || spHKB >= clHKB * 0.6) { // SP worth at least 60% of closer
+      return {
+        player: qualitySP[0], tag: 'SP #2', color: 'var(--purple)',
+        reason: `Only 1 SP — need SP2 before closer hunting. ${qualitySP[0].name} · HKB ${fmtK(spHKB)}.`,
+      };
+    }
+  }
 
   // ── PRIORITY 3a: Elite closer — only if not overridden by BDA value
   if (!rpFull && bestCL && round >= 5 && !closerOverridden) {
