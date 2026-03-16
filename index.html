@@ -505,7 +505,7 @@
   <div class="header-left">
     <div>
       <div class="header-logo">⚾ Chief Noc-A-Homa</div>
-      <div class="header-meta">DYNASTY BASEBALL · 2026 WAR ROOM · YAHOO · 12 TEAMS · SNAKE · PICK 8</div>
+      <div class="header-meta">DYNASTY BASEBALL · 2026 WAR ROOM · YAHOO · 12 TEAMS · SNAKE · PICK 8 · 30-MAN ROSTER</div>
     </div>
   </div>
   <div class="header-right">
@@ -1771,20 +1771,23 @@ const ROSTER_SLOTS = [
   {id:'P1',   label:'P-FLEX · SP3', posTypes:['SP'],          cls:'pflex',  role:'SP3 — Young K-arm'},
   {id:'P2',   label:'P-FLEX · CL',  posTypes:['RP'],          cls:'pflex',  role:'Closer #3 — SVH+ratios'},
   {id:'P3',   label:'P-FLEX · CL',  posTypes:['RP'],          cls:'pflex',  role:'Closer #4 — handcuff'},
-  // ── BENCH (5) ───────────────────────────────────────────────────
+  // ── BENCH (4) ───────────────────────────────────────────────────
   {id:'BN1',  label:'BN · SP',      posTypes:['SP'],          cls:'',       role:'SP bench — injury buffer'},
-  {id:'BN2',  label:'BN · H',       posTypes:['H'],           cls:'',       role:'Multi-pos hitter (2B/SS or 1B/3B)'},
+  {id:'BN2',  label:'BN · H',       posTypes:['H'],           cls:'',       role:'Multi-pos hitter depth'},
   {id:'BN3',  label:'BN · H',       posTypes:['H'],           cls:'',       role:'Speed specialist — SB depth'},
   {id:'BN4',  label:'BN · H',       posTypes:['H'],           cls:'',       role:'Power depth — HR/RBI insurance'},
-  {id:'BN5',  label:'BN · H',       posTypes:['H'],           cls:'',       role:'Young upside hitter age ≤24'},
   // ── IL (5) ──────────────────────────────────────────────────────
   {id:'IL1',  label:'IL',           posTypes:['H','SP','RP'], cls:'',       role:'Injured List'},
   {id:'IL2',  label:'IL',           posTypes:['H','SP','RP'], cls:'',       role:'Injured List'},
   {id:'IL3',  label:'IL',           posTypes:['H','SP','RP'], cls:'',       role:'Injured List'},
   {id:'IL4',  label:'IL',           posTypes:['H','SP','RP'], cls:'',       role:'Injured List'},
   {id:'IL5',  label:'IL',           posTypes:['H','SP','RP'], cls:'',       role:'Injured List'},
-  // ── NA (1) ──────────────────────────────────────────────────────
-  {id:'NA',   label:'NA',           posTypes:['H','SP','RP'], cls:'naslot', role:'Prospect stash — 1 max, age ≤22'},
+  // ── NA (5) ──────────────────────────────────────────────────────
+  {id:'NA1',  label:'NA',           posTypes:['H','SP','RP'], cls:'naslot', role:'Prospect stash #1 — age ≤22'},
+  {id:'NA2',  label:'NA',           posTypes:['H','SP','RP'], cls:'naslot', role:'Prospect stash #2 — age ≤22'},
+  {id:'NA3',  label:'NA',           posTypes:['H','SP','RP'], cls:'naslot', role:'Prospect stash #3 — age ≤22'},
+  {id:'NA4',  label:'NA',           posTypes:['H','SP','RP'], cls:'naslot', role:'Prospect stash #4 — age ≤22'},
+  {id:'NA5',  label:'NA',           posTypes:['H','SP','RP'], cls:'naslot', role:'Prospect stash #5 — age ≤22'},
 ];
 
 // ════════════════════════════════════════════════════════════════════
@@ -2513,14 +2516,15 @@ function autoAssignSlot(player) {
 }
 
 // ════════════════════════════════════════════════════════════════════
-// DRAFT CONSTITUTION — Chief Noc-A-Homa · Final · Split A
+// DRAFT CONSTITUTION — Chief Noc-A-Homa · Final · Split B
 // ────────────────────────────────────────────────────────────────────
 // ACTIVE:  C·1B·2B·3B·SS·OF×3·UTIL | SP1·SP2·RP1·RP2·P1(SP3)·P2(CL)·P3(CL)
-// BENCH:   BN1(SP) · BN2-5(H) · NA(1 prospect max)
+// BENCH:   BN1(SP) · BN2-4(H) · NA×5 (prospects, age ≤22) · IL×5
 // RULES:   4 SPs total (SP1·SP2·P1·BN1) | 4 closers (RP1·RP2·P2·P3)
 //          No RP on bench ever | SP allowed on bench
-//          1 prospect max in NA | Age 35+ only rounds 20+
+//          5 prospect max in NA slots | Age 35+ only rounds 20+
 // WIN-NOW: Prefer age ≤32 contributors | Fill positional gaps within 2 picks
+// TOTAL:   30 roster spots (16 active + 4 BN + 5 NA + 5 IL)
 // ════════════════════════════════════════════════════════════════════
 const CONSTITUTION = {
   // Pitching structure
@@ -2538,16 +2542,16 @@ const CONSTITUTION = {
   // SP quality thresholds
   ACE_HKB_MIN:        4000,
   ACE_PITCH_PLUS:     115,
-  // Bench hitters: BN2-5 = 4 hitters (multi-pos, speed, power, young)
-  BENCH_H_SLOTS:      4,
-  // Prospects
-  MAX_PROSPECTS:      1,
+  // Bench hitters: BN2-4 = 3 hitters (multi-pos, speed, power)
+  BENCH_H_SLOTS:      3,
+  // Prospects — 5 NA slots, start stashing round 13
+  MAX_PROSPECTS:      5,
   PROSPECT_AGE_MAX:   22,
-  PROSPECT_RD_MIN:    14,   // don't stash a prospect before round 14
+  PROSPECT_RD_MIN:    13,   // start stashing prospects round 13 (5 slots to fill)
   // General
   VET_AGE_CUTOFF:     35,   // avoid 35+ before round 20
   VET_ROUND_MIN:      20,
-  GAP_GRACE_PICKS:    2,    // picks a positional gap is tolerated before force-fill
+  GAP_GRACE_PICKS:    2,
 };
 
 // ════════════════════════════════════════════════════════════════════
@@ -2860,11 +2864,14 @@ function getTakeRecommendation() {
   };
 
   // ── PRIORITY 7: Prospect stash ────────────────────────────────────
-  if (myProsp.length < C.MAX_PROSPECTS && round >= C.PROSPECT_RD_MIN && !STATE.rosterSlots['NA']) {
-    const prosp = pool.filter(p=>p.prosp&&(p.age||99)<=C.PROSPECT_AGE_MAX)[0];
+  // 5 NA slots — stash elite prospects rounds 13-23
+  const naFilled = ['NA1','NA2','NA3','NA4','NA5'].filter(id => STATE.rosterSlots[id]).length;
+  if (myProsp.length < C.MAX_PROSPECTS && round >= C.PROSPECT_RD_MIN && naFilled < 5) {
+    const prosp = pool.filter(p=>p.prosp&&(p.age||99)<=C.PROSPECT_AGE_MAX)
+                      .sort((a,b)=>(b.hkb||0)-(a.hkb||0))[0];
     if (prosp) return {
       player:prosp, tag:'NA STASH', color:'var(--purple)',
-      reason:`NA slot open. ${prosp.name} (age ${prosp.age}) — best prospect stash. 1 max.`,
+      reason:`${naFilled}/5 NA slots filled. ${prosp.name} (age ${prosp.age}) · HKB ${fmtK(prosp.hkb||0)} — dynasty upside. Stash now before gone.`,
     };
   }
 
