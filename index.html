@@ -884,6 +884,9 @@ const HKB_RAW = {
   'orion kerkering':620,'ben joyce':600,'luis de leon':580,'kirby yates':560,
   'kyle finnegan':540,'robert suarez':520,'lucas erceg':500,
   'roki sasaki':2460,'chase dollander':1380,'bubba chandler':2180,
+  'isaac paredes':1920,'cam smith':1040,'alec bohm':1180,'eugenio suarez':480,
+  'luis robert jr':1760,'ceddanne rafaela':1640,'geraldo perdomo':1800,
+  'taylor trammell':300,
 'aaron ashby':300,
   'aaron civale':300,
   'adam cimber':100,
@@ -2607,12 +2610,15 @@ function getPosGaps() {
     p.pos==='OF'||p.pos.startsWith('OF/')||p.pos.includes('/OF')
   ).length;
 
-  // OF pool — don't require HKB (Robert Jr, Betts etc may be missing HKB)
-  // Use DYN Z > 0 as minimum quality bar instead
+  // OF pool — DYN Z primary sort, HKB fallback
   const ofPool = STATE.players.filter(p => avail(p) && !p.prosp &&
     ((p.hkb||0) >= 400 || (p.dynZ||0) > 0.1) &&
     (p.pos==='OF'||p.pos.startsWith('OF/')||p.pos.includes('/OF'))
-  ).sort((a,b) => ((b.hkb||0)||(b.dynZ||0)*1000) - ((a.hkb||0)||(a.dynZ||0)*1000));
+  ).sort((a,b) => {
+    const dynDiff = (b.dynZ||0) - (a.dynZ||0);
+    if (Math.abs(dynDiff) > 0.05) return dynDiff;
+    return (b.hkb||0) - (a.hkb||0);
+  });
 
   const gaps = [];
 
@@ -2631,7 +2637,13 @@ function getPosGaps() {
     const urgency = round >= thresh.force ? 'force' : 'warn';
     const pool = STATE.players.filter(p => avail(p) && noPros(p) &&
       (p.pos===pos||p.pos.startsWith(pos+'/')||p.pos.includes('/'+pos))
-    ).sort((a,b)=>(b.hkb||0)-(a.hkb||0));
+    ).sort((a,b) => {
+      // Primary: DYN Z — best dynasty fit for the position
+      // Fallback: HKB — market value when DYN Z is tied or zero
+      const dynDiff = (b.dynZ||0) - (a.dynZ||0);
+      if (Math.abs(dynDiff) > 0.05) return dynDiff;
+      return (b.hkb||0) - (a.hkb||0);
+    });
     if (pool.length) gaps.push({ pos, urgency, best: pool[0], round: thresh.force });
   }
 
