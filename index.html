@@ -505,7 +505,7 @@
   <div class="header-left">
     <div>
       <div class="header-logo">⚾ Chief Noc-A-Homa</div>
-      <div class="header-meta">DYNASTY BASEBALL · 2026 WAR ROOM · YAHOO · 12 TEAMS · SNAKE · PICK 8 · 20 ROUNDS · 30-MAN ROSTER</div>
+      <div class="header-meta">DYNASTY BASEBALL · 2026 WAR ROOM · YAHOO · 12 TEAMS · SNAKE · PICK 4 · 20 ROUNDS · 30-MAN ROSTER</div>
     </div>
   </div>
   <div class="header-right">
@@ -829,8 +829,8 @@ const SNAKE_PICKS = (function() {
   const picks = [];
   for (let r = 1; r <= 20; r++) {
     const overall = r % 2 === 1
-      ? (r - 1) * 12 + 8
-      : r * 12 - 7;
+      ? (r - 1) * 12 + 4   // odd rounds: pick 4
+      : r * 12 - 3;         // even rounds: pick 9
     picks.push({ round: r, overall });
   }
   return picks;
