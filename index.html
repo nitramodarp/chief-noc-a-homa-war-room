@@ -1739,12 +1739,12 @@ const CIELY_RAW = {
 };
 
 const KNOWN_PROSPECTS = new Set([
+  // Elite dynasty prospects — pre-40-man or recently graduated
   'konnor griffin','roman anthony','kevin mcgonigle','samuel basallo',
   'colt emerson','druw jones','dylan crews','colson montgomery',
   'max clark','zac veen','enrique bradfield jr','jacob wilson',
   'orelvis martinez','cam mclean','thomas white','andrew painter',
   'jackson jobe','trey yesavage','noble meyer',
-  // NOTE: ben joyce, orion kerkering removed — MLB-ready arms, eligible for late RP picks
   'jesus made','leo de vries',
   'jj wetherholt','jackson holliday','coby mayo','evan carter',
   'cam collier','walker jenkins','aidan miller','chase davis',
@@ -1753,6 +1753,17 @@ const KNOWN_PROSPECTS = new Set([
   'jose salas','brice matthews','gavin williams','dylan lesko',
   'jacob misiorowski','chase dollander','jurrangelo cijntje',
   'aj sloan','bryce rainer',
+  // Age 23-24 high-upside players worth NA stashing
+  'james wood','jackson chourio','wyatt langford','junior caminero',
+  'nick kurtz','cj abrams','masyn winn','jackson merrill',
+  'pete crow armstrong','james wood','sal frelick','bryan woo',
+  'tanner bibee','grayson rodriguez','spencer schwellenbach',
+  'chase burns','roki sasaki','bubba chandler','gavin williams',
+  'nolan mclean','jj wetherholt','chase dollander',
+  'colton cowser','jackson holliday','noah schultz',
+  'zac veen','cam collier','aidan miller',
+  // Notable international/recently signed prospects
+  'tatsuya imai','roki sasaki',
 ]);
 // ════════════════════════════════════════════════════════════════════
 const ROSTER_SLOTS = [
@@ -2549,7 +2560,7 @@ const CONSTITUTION = {
   BENCH_H_SLOTS:      3,
   // Prospects — 5 NA slots, start stashing round 13
   MAX_PROSPECTS:      5,
-  PROSPECT_AGE_MAX:   22,
+  PROSPECT_AGE_MAX:   24,   // raised from 22 — catches age 23-24 NA-eligible players
   PROSPECT_RD_MIN:    12,   // start stashing prospects round 12 (5 slots, 20-round draft)
   // General
   VET_AGE_CUTOFF:     35,   // avoid 35+ before round 20
@@ -2824,24 +2835,28 @@ function getTakeRecommendation() {
   }
 
   // ── PRIORITY 3b: NA prospect stash — fires BEFORE BDA in rounds 12+ ──
-  // With 5 NA slots and only 8 rounds left, prospects must compete with BDA.
-  // An elite prospect (HKB ≥ 800 or Ciely top 150) beats generic BDA filler.
+  // Threshold scales down as draft progresses — more aggressive each round.
+  // Round 12: take prospect unless BDA is 2.0× more valuable
+  // Round 15: take prospect unless BDA is 1.5× more valuable
+  // Round 17+: always take prospect (can't afford to miss NA slots)
   const naFilled = ['NA1','NA2','NA3','NA4','NA5'].filter(id => STATE.rosterSlots[id]).length;
   if (myProsp.length < C.MAX_PROSPECTS && round >= C.PROSPECT_RD_MIN && naFilled < 5) {
     const prospects = pool.filter(p => p.prosp && (p.age||99) <= C.PROSPECT_AGE_MAX)
-      .sort((a,b) => (b.hkb||0) - (a.hkb||0));
+      .sort((a,b) => (b.hkb||0) - (a.hkb||0) || (b.dynZ||0) - (a.dynZ||0));
     const topProsp = prospects[0];
     if (topProsp) {
-      const prospHKB = topProsp.hkb || 0;
+      const prospHKB = topProsp.hkb || 200; // floor so low-HKB prospects still compare
       const bdaHKBnow = bda?.hkb || 0;
-      // Take prospect if: BDA isn't significantly more valuable (< 2× prospect HKB)
-      // OR if we're running out of rounds (< 4 picks left)
       const picksLeft = SNAKE_PICKS.filter(p => p.overall >= STATE.currentPick).length;
-      const urgentStash = picksLeft <= 4 || naFilled === 0;
-      if (urgentStash || bdaHKBnow < prospHKB * 2.0) {
+      const slotsLeft = 5 - naFilled;
+      // Scale threshold: 2.0x at R12 → 1.0x at R18+
+      const urgencyMult = Math.max(1.0, 2.0 - (round - 12) * 0.17);
+      // Force stash if we're running out of time
+      const urgentStash = picksLeft <= slotsLeft + 1 || round >= 17 || naFilled === 0;
+      if (urgentStash || bdaHKBnow < prospHKB * urgencyMult) {
         return {
           player: topProsp, tag: 'NA STASH', color: 'var(--purple)',
-          reason: `${naFilled}/5 NA slots filled. ${topProsp.name} (age ${topProsp.age}) · HKB ${fmtK(prospHKB)} — dynasty farm system. ${picksLeft} picks left.`,
+          reason: `${naFilled}/5 NA slots · ${picksLeft} picks left · ${slotsLeft} slots open. ${topProsp.name} (age ${topProsp.age}) · HKB ${fmtK(prospHKB)}.`,
         };
       }
     }
