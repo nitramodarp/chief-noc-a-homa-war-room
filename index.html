@@ -2823,6 +2823,30 @@ function getTakeRecommendation() {
     };
   }
 
+  // ── PRIORITY 3b: NA prospect stash — fires BEFORE BDA in rounds 12+ ──
+  // With 5 NA slots and only 8 rounds left, prospects must compete with BDA.
+  // An elite prospect (HKB ≥ 800 or Ciely top 150) beats generic BDA filler.
+  const naFilled = ['NA1','NA2','NA3','NA4','NA5'].filter(id => STATE.rosterSlots[id]).length;
+  if (myProsp.length < C.MAX_PROSPECTS && round >= C.PROSPECT_RD_MIN && naFilled < 5) {
+    const prospects = pool.filter(p => p.prosp && (p.age||99) <= C.PROSPECT_AGE_MAX)
+      .sort((a,b) => (b.hkb||0) - (a.hkb||0));
+    const topProsp = prospects[0];
+    if (topProsp) {
+      const prospHKB = topProsp.hkb || 0;
+      const bdaHKBnow = bda?.hkb || 0;
+      // Take prospect if: BDA isn't significantly more valuable (< 2× prospect HKB)
+      // OR if we're running out of rounds (< 4 picks left)
+      const picksLeft = SNAKE_PICKS.filter(p => p.overall >= STATE.currentPick).length;
+      const urgentStash = picksLeft <= 4 || naFilled === 0;
+      if (urgentStash || bdaHKBnow < prospHKB * 2.0) {
+        return {
+          player: topProsp, tag: 'NA STASH', color: 'var(--purple)',
+          reason: `${naFilled}/5 NA slots filled. ${topProsp.name} (age ${topProsp.age}) · HKB ${fmtK(prospHKB)} — dynasty farm system. ${picksLeft} picks left.`,
+        };
+      }
+    }
+  }
+
   // ── PRIORITY 4: BDA — sorted by mode ──────────────────────────────
   // DYNASTY mode:  sort by DYN Z (age-weighted model — values youth)
   // WIN-NOW mode:  sort by HKB  (market value — values contributors)
@@ -2875,15 +2899,14 @@ function getTakeRecommendation() {
     reason:`No elite closers left. ${solidRP[0].name}: ${solidRP[0].stat5} SVH — best available SV+H arm.`,
   };
 
-  // ── PRIORITY 7: Prospect stash ────────────────────────────────────
-  // 5 NA slots — stash elite prospects rounds 13-23
-  const naFilled = ['NA1','NA2','NA3','NA4','NA5'].filter(id => STATE.rosterSlots[id]).length;
+  // ── PRIORITY 7: Prospect stash (late fallback) ───────────────────
+  // Catches any remaining NA slots not filled by Priority 3b
   if (myProsp.length < C.MAX_PROSPECTS && round >= C.PROSPECT_RD_MIN && naFilled < 5) {
     const prosp = pool.filter(p=>p.prosp&&(p.age||99)<=C.PROSPECT_AGE_MAX)
                       .sort((a,b)=>(b.hkb||0)-(a.hkb||0))[0];
     if (prosp) return {
       player:prosp, tag:'NA STASH', color:'var(--purple)',
-      reason:`${naFilled}/5 NA slots filled. ${prosp.name} (age ${prosp.age}) · HKB ${fmtK(prosp.hkb||0)} — dynasty upside. Stash now before gone.`,
+      reason:`${naFilled}/5 NA slots filled. ${prosp.name} (age ${prosp.age}) — stash now.`,
     };
   }
 
