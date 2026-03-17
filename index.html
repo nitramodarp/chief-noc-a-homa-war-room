@@ -883,6 +883,8 @@ const HKB_RAW = {
   'orion kerkering':620,'ben joyce':600,'luis de leon':580,'kirby yates':560,
   'kyle finnegan':540,
   'roki sasaki':2460,'chase dollander':1380,'bubba chandler':2180,
+  // Missing closers added post-audit
+  'cade smith':3200,'aroldis chapman':2200,'abner uribe':1800,'griffin jax':900,
   // 2B/multi-position players missing from table
   'ozzie albies':2200,'mookie betts':2800,'marcus semien':1400,
   'jorge polanco':1600,'max muncy':900,'ha seong kim':800,
@@ -3011,10 +3013,14 @@ const NOTES_OVERRIDES = {
   'aj minter':      '⚠️ IL to start 2026 — torn lat surgery May 2025. Return ~May. 3 live BPs, 93mph. High-leverage setup when healthy.',
   'zach neto':      '⚠️ Wrist sprain Mar 14 (headfirst slide) — no fracture, day-to-day, Ready Opening Day. 3rd hand/wrist injury in 12 months. Injury pattern risk.',
   'bryan woo':      'Healthy for 2026 — pec issue ended 2025 late. Skipped WBC to protect arm. Targeting 200 IP as SEA ace. Ciely #4 SP.',
+  'seiya suzuki':   '⚠️ Right knee WBC injury Mar 14 — walked off under own power. Awaiting diagnosis. Possible IL to start season.',
+  'josh hader':     '⚠️ Arm injury nursing — mentioned as concern heading into 2026. Monitor before drafting.',
 };
 const FLAG_OVERRIDES = {
   'aj minter':      '⚠️ IL — May return',
   'zach neto':      '⚠️ Injury pattern — wrist x3',
+  'seiya suzuki':   '⚠️ Knee — WBC injury',
+  'josh hader':     '⚠️ Arm concern',
 };
 // ════════════════════════════════════════════════════════════════════
 const ROSTER_SLOTS = [
@@ -3888,7 +3894,7 @@ const BANNED_PLAYERS = new Set([
 // These have low SVH projections but may still appear via solidRP fallback
 const SUPPRESSED_CLOSERS = new Set([
   'jordan romano',    // Health risk, 10 SVH projection — not a true SV+H asset
-  'raisel iglesias',  // LAA, aging, declining role
+  'raisel iglesias',  // ATL, aging, declining role — Robert Suarez is primary closer
 ]);
 
 function isBanned(name) {
