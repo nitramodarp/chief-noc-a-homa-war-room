@@ -438,14 +438,12 @@
     .data-table td:nth-child(6),
     .data-table th:nth-child(4),  /* TEAM */
     .data-table td:nth-child(4),
-    .data-table th:nth-child(10), /* VORP */
+    .data-table th:nth-child(10), /* CIELY */
     .data-table td:nth-child(10),
-    .data-table th:nth-child(11), /* CIELY */
+    .data-table th:nth-child(11), /* C.Z */
     .data-table td:nth-child(11),
-    .data-table th:nth-child(12), /* C.Z */
-    .data-table td:nth-child(12),
-    .data-table th:nth-child(15), /* NOTES */
-    .data-table td:nth-child(15)
+    .data-table th:nth-child(13), /* NOTES */
+    .data-table td:nth-child(13)
     { display: none; }
 
     /* Make player name cell wrap better on mobile */
@@ -594,11 +592,9 @@
                   <th onclick="setSort('pitchPlus')" data-col="pitchPlus" title="Eno Sarris Pitching+ (SPs only). 100=avg, 115+=elite. NOW ADJUSTS DYN Z: ≥118 +12%, ≥110 +5%, ≥103 ±0%, ≥97 -8%, below -15%. ▲/▼ in DYN Z column shows adjustment.">PITCH+</th>
                   <th title="Stuff+ / Location+ / Health — Eno Sarris pitch report. Hover player name for full scouting note." style="min-width:110px">S+ · L+ · HLTH</th>
                   <th onclick="setSort('dynZ')" data-col="dynZ" title="DYN Z = VORP × age multiplier × Pitch+ adjustment. Primary dynasty ranking signal.">DYN Z</th>
-                  <th onclick="setSort('rawZ')" data-col="rawZ" title="VORP — pure z-score before age or Pitch+ adjustments.">VORP</th>
                   <th onclick="setSort('ciely')" data-col="ciely" title="Jake Ciely dynasty rank (Feb 26 2026). Lower = better. 0 = unranked in top 400.">CIELY</th>
                   <th onclick="setSort('cielySd')" data-col="cielySd" title="Ciely positional z-score (SD) — value over replacement at your position. Higher = better. More accurate than overall VORP for positional value.">C.Z</th>
                   <th onclick="setSort('hkb')" data-col="hkb" title="HarryKnowsBall crowdsourced dynasty market value">HKB</th>
-                  <th onclick="setSort('delta')" data-col="delta" title="Delta: positive = market undervaluing vs our model = BUY. Negative = market overvaluing = SELL.">DELTA</th>
                   <th>NOTES</th>
                   <th style="min-width:62px"></th>
                 </tr>
@@ -683,7 +679,7 @@
             <thead><tr>
               <th onclick="setSort('ovrRk')" data-col="ovrRk">RK</th>
               <th>NAME</th><th>POS</th><th>AGE</th><th>TEAM</th>
-              <th>DYN Z</th><th>HKB</th><th>DELTA</th><th></th>
+              <th>DYN Z</th><th>VORP</th><th>HKB</th><th>DELTA</th><th></th>
             </tr></thead>
             <tbody id="myRosterTbody"></tbody>
           </table>
@@ -3517,7 +3513,6 @@ function renderPlayerTable() {
               ${p.pitchMult>1?'▲':'▼'}P+</span>`
           : ''}
       </td>
-      <td class="mono" style="font-size:12px;color:var(--text-dim);font-weight:600">${p.rawZ !== null ? fmtN(p.rawZ, 3) : '—'}</td>
       <td class="mono" style="font-size:12px;font-weight:700;color:${
         p.ciely > 0 && p.ciely <= 25  ? 'var(--green)'  :
         p.ciely > 0 && p.ciely <= 75  ? 'var(--gold)'   :
@@ -3532,13 +3527,12 @@ function renderPlayerTable() {
         p.cielySd > 0    ? 'var(--text-dim)': 'var(--text-muted)'
       }" title="Ciely positional z-score: ${p.cielySd?.toFixed(2) || '—'}">${p.cielySd > 0 ? p.cielySd.toFixed(1) : '—'}</td>
       <td class="mono" style="font-size:13px;color:var(--purple);font-weight:600">${p.hkb > 0 ? fmtK(p.hkb) : '—'}</td>
-      <td class="mono ${delta !== null ? deltaClass(delta) : ''}" style="font-size:11px;font-weight:700" title="HKB rank: ${p.hkbRank} | DYN rank: ${p.dynRank}">${delta !== null ? deltaLabel(delta) : '—'}</td>
       <td style="font-size:10px;color:var(--text-dim);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${p.notes}">${p.notes || ''}</td>
       <td>${draftHtml}</td>
     </tr>`;
   }
 
-  tbody.innerHTML = html || `<tr><td colspan="11" style="text-align:center;padding:32px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:1px">NO PLAYERS FOUND</td></tr>`;
+  tbody.innerHTML = html || `<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:1px">NO PLAYERS FOUND</td></tr>`;
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -3697,6 +3691,7 @@ function renderMyRoster() {
             <td class="mono" style="font-size:11px">${p.age ? p.age.toFixed(1) : '—'}</td>
             <td class="mono" style="font-size:10px;color:var(--text-dim)">${p.team || '—'}</td>
             <td class="mono" style="font-size:11px;color:var(--green);font-weight:600">${p.dynZ !== null ? fmtN(p.dynZ, 3) : '—'}</td>
+            <td class="mono" style="font-size:11px;color:var(--text-dim)">${p.rawZ !== null ? fmtN(p.rawZ, 3) : '—'}</td>
             <td class="mono" style="font-size:11px;color:var(--purple)">${p.hkb > 0 ? fmtK(p.hkb) : '—'}</td>
             <td class="mono ${delta !== null ? deltaClass(delta) : ''}" style="font-size:10px">${delta !== null ? deltaLabel(delta) : '—'}</td>
             <td><button class="undo-btn" onclick="undraftPlayer('${esc(p.name)}')">✕</button></td>
@@ -3940,7 +3935,10 @@ function getPosGaps() {
     const pool = STATE.players.filter(p => avail(p) && noPros(p) &&
       (p.pos===pos||p.pos.startsWith(pos+'/')||p.pos.includes('/'+pos))
     ).sort((a,b) => {
-      // Primary: DYN Z — best dynasty fit for the position
+      // Primary: C.Z (Ciely positional z-score) — position-normalized value
+      // Falls back to DYN Z if C.Z is missing, then HKB for ties
+      const czDiff = (b.cielySd||0) - (a.cielySd||0);
+      if ((a.cielySd||0) > 0 && (b.cielySd||0) > 0 && Math.abs(czDiff) > 0.3) return czDiff;
       const dynDiff = (b.dynZ||0) - (a.dynZ||0);
       if (Math.abs(dynDiff) > 0.05) return dynDiff;
       // Tiebreak: prefer younger players (PRIME ≤28 over AGING 29-31)
