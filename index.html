@@ -3254,6 +3254,24 @@ async function fetchPlayers() {
         hkb: 0, hkbRank: 0, dynRank: 0, delta: 0,
       });
     }
+
+    // ── HARDCODED PLAYERS missing from sheet ─────────────────────────
+    // Bryan Woo — SEA ace, not in sheet. Data from Ciely projections + Eno.
+    if (!players.find(p => cleanName(p.name) === 'bryan woo')) {
+      players.push({
+        num: 0, name: 'Bryan Woo', pos: 'SP', age: 26.3, team: 'SEA', type: 'SP',
+        stat1: 190.6,   // K
+        stat2: 3.506,   // ERA
+        stat3: 1.063,   // WHIP
+        stat4: null,    // QS — from sheet when available
+        stat5: 0,       // SV+H
+        rawZ: 0.622,    // VORP from Ciely
+        dynZ: 0.622,
+        poolRk: 4, ovrRk: 43,
+        prosp: false, flag: '', sheetHKB: 0,
+        notes: 'Healthy for 2026 — pec issue ended 2025 late. Skipped WBC to protect arm. Targeting 200 IP as SEA ace.',
+      });
+    }
     // ─────────────────────────────────────────────────────────────────
 
     setProgress(55, 'COMPUTING DELTA RANKINGS...');
