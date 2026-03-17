@@ -3934,9 +3934,11 @@ function getPosGaps() {
       (p.pos===pos||p.pos.startsWith(pos+'/')||p.pos.includes('/'+pos))
     ).sort((a,b) => {
       // Primary: DYN Z — best dynasty fit for the position
-      // Fallback: HKB — market value when DYN Z is tied or zero
       const dynDiff = (b.dynZ||0) - (a.dynZ||0);
       if (Math.abs(dynDiff) > 0.05) return dynDiff;
+      // Tiebreak: prefer younger players (PRIME ≤28 over AGING 29-31)
+      const ageA = a.age || 30, ageB = b.age || 30;
+      if (Math.abs(ageA - ageB) > 1.5) return ageA - ageB;
       return (b.hkb||0) - (a.hkb||0);
     });
     if (pool.length) gaps.push({ pos, urgency, best: pool[0], round: thresh.force });
@@ -4043,18 +4045,26 @@ function getTakeRecommendation() {
   // genuinely dries up. Never fills with a prospect.
   const gaps = getPosGaps();
   const forceGaps = gaps.filter(g=>g.urgency==='force');
-  if (forceGaps.length === 1) {
+
+  // ── SP EMERGENCY OVERRIDE ──────────────────────────────────────────
+  // If force-fill would take a hitter slot but we're critically short on SP,
+  // let SP urgency win. A team with 1 SP in round 10 is in serious trouble.
+  const spEmergency = spCount < 2 && round >= 9 && poolSP.filter(p=>(p.hkb||0)>=400||(p.dynZ||0)>0).length > 0;
+
+  if (forceGaps.length === 1 && !spEmergency) {
     // Single force-fill — take it
     return {
       player: forceGaps[0].best, tag:`FILL ${forceGaps[0].pos}`, color:'var(--red)',
       reason:`${forceGaps[0].pos} still empty in round ${round} — costing you category points every week. Non-negotiable fill.`,
     };
   } else if (forceGaps.length > 1) {
-    // Multiple positions both need filling — pick the best player by HKB then DYN Z
+    // Multiple positions both need filling — pick the best player by HKB then DYN Z then age
     forceGaps.sort((a,b) => {
       const hkbDiff = (b.best.hkb||0) - (a.best.hkb||0);
       if (Math.abs(hkbDiff) > 200) return hkbDiff;
-      return (b.best.dynZ||0) - (a.best.dynZ||0);
+      const dynDiff = (b.best.dynZ||0) - (a.best.dynZ||0);
+      if (Math.abs(dynDiff) > 0.1) return dynDiff;
+      return (a.best.age||30) - (b.best.age||30); // prefer younger
     });
     const winner = forceGaps[0];
     const others = forceGaps.slice(1).map(g=>g.pos).join(', ');
