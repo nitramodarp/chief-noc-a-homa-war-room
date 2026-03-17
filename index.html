@@ -3881,7 +3881,7 @@ function isBanned(name) {
 const POS_URGENCY = {
   //       warn  force
   SS:   { warn: 2,  force: 4  },  // scarcest position — fills fastest
-  C:    { warn: 5,  force: 8  },  // only 2-3 worth owning in any league
+  C:    { warn: 3,  force: 7  },  // only 3-4 worth owning — window closes fast
   '1B': { warn: 3,  force: 6  },  // deep but important for scoring
   '3B': { warn: 4,  force: 7  },
   '2B': { warn: 4,  force: 7  },
@@ -4042,11 +4042,27 @@ function getTakeRecommendation() {
   // Uses round-based thresholds — not triggered until position
   // genuinely dries up. Never fills with a prospect.
   const gaps = getPosGaps();
-  const forceGap = gaps.find(g=>g.urgency==='force');
-  if (forceGap) return {
-    player:forceGap.best, tag:`FILL ${forceGap.pos}`, color:'var(--red)',
-    reason:`${forceGap.pos} still empty in round ${round} — costing you category points every week. Non-negotiable fill.`,
-  };
+  const forceGaps = gaps.filter(g=>g.urgency==='force');
+  if (forceGaps.length === 1) {
+    // Single force-fill — take it
+    return {
+      player: forceGaps[0].best, tag:`FILL ${forceGaps[0].pos}`, color:'var(--red)',
+      reason:`${forceGaps[0].pos} still empty in round ${round} — costing you category points every week. Non-negotiable fill.`,
+    };
+  } else if (forceGaps.length > 1) {
+    // Multiple positions both need filling — pick the best player by HKB then DYN Z
+    forceGaps.sort((a,b) => {
+      const hkbDiff = (b.best.hkb||0) - (a.best.hkb||0);
+      if (Math.abs(hkbDiff) > 200) return hkbDiff;
+      return (b.best.dynZ||0) - (a.best.dynZ||0);
+    });
+    const winner = forceGaps[0];
+    const others = forceGaps.slice(1).map(g=>g.pos).join(', ');
+    return {
+      player: winner.best, tag:`FILL ${winner.pos}`, color:'var(--red)',
+      reason:`${winner.pos} wins value battle over ${others} · HKB ${fmtK(winner.best.hkb||0)} · still need ${others} soon.`,
+    };
+  }
 
   // ── PRIORITY 2: Ace SP if none — but only if BDA isn't elite ─────
   // Never recommend an ace SP over a player with significantly
