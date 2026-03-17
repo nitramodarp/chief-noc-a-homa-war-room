@@ -574,7 +574,7 @@
             <button class="filter-btn" onclick="setFilter('OF',this)">OF</button>
             <button class="filter-btn" onclick="setFilter('PROSP',this)">★ Prospects</button>
             <button class="filter-btn warn" onclick="toggleHideDrafted(this)">Hide Drafted</button>
-            <button class="filter-btn" style="margin-left:auto" onclick="advancePick()">Skip Pick ›</button>
+            <button class="filter-btn" style="margin-left:auto" onclick="skipSuggestion()" title="Show next best TAKE suggestion">Skip Suggestion ›</button>
           </div>
           <div class="search-wrap">
             <input class="search-input" id="searchInput" type="text" placeholder="Search player name, team, position..." oninput="setSearch(this.value)" autocomplete="off">
@@ -3077,6 +3077,7 @@ const STATE = {
   waiverFilter: 'ALL',
   lastSync: null,
   winNow: true,   // true = win-now balance (user preference)
+  skippedPlayers: new Set(), // players skipped from TAKE recommendation this pick
 };
 
 // ════════════════════════════════════════════════════════════════════
@@ -3725,6 +3726,7 @@ function draftPlayer(name) {
     autoAssignSlot(player);
   }
   STATE.currentPick++;
+  STATE.skippedPlayers.clear(); // reset skips for next pick
   saveState();
   renderAll();
 }
@@ -3747,8 +3749,19 @@ function undraftPlayer(name) {
 function advancePick() {
   if (STATE.currentPick < CONFIG.TOTAL_PICKS) {
     STATE.currentPick++;
+    STATE.skippedPlayers.clear(); // reset skips for new pick
     saveState();
     renderAll();
+  }
+}
+
+function skipSuggestion() {
+  // Get current recommendation and add it to skipped set
+  const rec = getTakeRecommendation();
+  if (rec && rec.player) {
+    STATE.skippedPlayers.add(rec.player.name);
+    renderTakeCard();
+    renderPickPanel();
   }
 }
 
@@ -3987,7 +4000,7 @@ function getTakeRecommendation() {
   if (!STATE.players.length) return null;
   const my    = STATE.myDrafted;
   const round = getRound();
-  const avail = p => !STATE.drafted.has(p.name) && !isBanned(p.name) && !p.name.includes('(SP)');
+  const avail = p => !STATE.drafted.has(p.name) && !isBanned(p.name) && !p.name.includes('(SP)') && !STATE.skippedPlayers.has(p.name);
   const C = CONSTITUTION;
 
   // ── Roster counts ─────────────────────────────────────────────────
@@ -4294,6 +4307,7 @@ function renderTakeCard() {
     ${p.team ? `<span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--text-muted)">${p.team}</span>` : ''}
     ${p.age  ? `<span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--text-muted)">age ${p.age.toFixed(1)}</span>` : ''}
     ${p.hkb  ? `<span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--purple);font-weight:600">HKB ${fmtK(p.hkb)}</span>` : ''}
+    ${STATE.skippedPlayers.size > 0 ? `<span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--text-muted);opacity:0.7">suggestion ${STATE.skippedPlayers.size + 1} of ${STATE.skippedPlayers.size + 1}</span>` : ''}
   `;
   if (nameEl)  { nameEl.textContent  = p.name; nameEl.style.color = rec.color; }
   if (reasonEl)  reasonEl.textContent = rec.reason;
