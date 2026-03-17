@@ -3007,6 +3007,17 @@ const TEAM_OVERRIDES = {
   'trea turner':        'PHI',  // long-term deal
   'francisco lindor':   'NYM',  // long-term deal
 };
+
+// ════════════════════════════════════════════════════════════════════
+// NOTES & FLAG OVERRIDES — spring training injuries, role changes
+// Applied at parse time over sheet data. Keep current as of draft day.
+// ════════════════════════════════════════════════════════════════════
+const NOTES_OVERRIDES = {
+  'aj minter':      '⚠️ IL to start 2026 — torn lat surgery May 2025. Return ~May. 3 live BPs, 93mph. High-leverage setup when healthy.',
+};
+const FLAG_OVERRIDES = {
+  'aj minter':      '⚠️ IL — May return',
+};
 // ════════════════════════════════════════════════════════════════════
 const ROSTER_SLOTS = [
   // ── ACTIVE HITTERS (9) ──────────────────────────────────────────
@@ -3205,8 +3216,7 @@ async function fetchPlayers() {
         name:   name,
         pos:    (cols[2] || '').trim(),
         age:    pf(cols[3]),
-        team:   TEAM_OVERRIDES[cleanName(name)] || (cols[4] || '').trim(),
-        type:   type,
+        team:   TEAM_OVERRIDES[cleanName(name)] || (cols[4] || '').trim(),        type:   type,
         stat1:  pf(cols[6]),
         stat2:  pf(cols[7]),
         stat3:  pf(cols[8]),
@@ -3217,8 +3227,8 @@ async function fetchPlayers() {
         poolRk: pi(cols[19]),
         ovrRk:  pi(cols[20]),
         prosp:  KNOWN_PROSPECTS.has(cleanName(name)),
-        flag:   (cols[22] || '').trim(),
-        notes:  (cols[23] || '').trim(),
+        flag:   FLAG_OVERRIDES[cleanName(name)]  || (cols[22] || '').trim(),
+        notes:  NOTES_OVERRIDES[cleanName(name)] || (cols[23] || '').trim(),
         sheetHKB: pi(cols[24]) || 0,
         hkb: 0, hkbRank: 0, dynRank: 0, delta: 0, pitchPlus: null, ciely: 0,
       });
@@ -3858,8 +3868,9 @@ const CONSTITUTION = {
 // (gambling investigations, lifetime bans, career-ending situations)
 // ════════════════════════════════════════════════════════════════════
 const BANNED_PLAYERS = new Set([
-  'emmanuel clase',   // Federal indictment — rigging pitches for gamblers. Likely never pitches again.
-  'luis ortiz',       // Same investigation as Clase — co-indicted.
+  'emmanuel clase',      // Federal indictment — rigging pitches for gamblers. Likely never pitches again.
+  'luis ortiz',          // Same investigation as Clase — co-indicted.
+  'jurickson profar',    // 162-game PED suspension (exogenous testosterone) — entire 2026 season. 2nd offense. Appealing but long shot.
 ]);
 
 // Low-value RPs to suppress from closer recommendations
