@@ -887,6 +887,11 @@ const HKB_RAW = {
   'orion kerkering':620,'ben joyce':600,'luis de leon':580,'kirby yates':560,
   'kyle finnegan':540,
   'roki sasaki':2460,'chase dollander':1380,'bubba chandler':2180,
+  // 2B/multi-position players missing from table
+  'ozzie albies':2200,'mookie betts':2800,'marcus semien':1400,
+  'jorge polanco':1600,'max muncy':900,'ha seong kim':800,
+  // Other missing players
+  'christian moore':1200,'jackson chourio':5200,'colton cowser':1100,
   'isaac paredes':1920,'cam smith':1040,'alec bohm':1180,'eugenio suarez':480,
   'luis robert jr':1760,'ceddanne rafaela':1640,'geraldo perdomo':1800,
   'taylor trammell':300,
@@ -3898,7 +3903,9 @@ function getPosGaps() {
   const my = STATE.myDrafted;
   const round = getRound();
   const avail = p => !STATE.drafted.has(p.name) && !isBanned(p.name);
-  const noPros = p => !p.prosp && (p.hkb||0) >= 500;
+  // noPros: not a prospect AND has value — HKB ≥ 500 preferred but DYN Z > -0.5
+  // catches legitimate players with missing HKB data (Albies, Betts, etc)
+  const noPros = p => !p.prosp && ((p.hkb||0) >= 500 || (p.dynZ||0) > -0.5);
 
   const has = pos => my.some(p => p.pos===pos||p.pos.startsWith(pos+'/')||p.pos.includes('/'+pos));
   const ofCount = my.filter(p =>
@@ -4364,7 +4371,8 @@ function getWarRoomAdvice() {
   const isContributor = p => (p.age||99) <= 32 && (p.hkb||0) >= 1500 && !p.prosp;
 
   // Non-prospect hitter filter — never suggest a prospect to fill a starting slot
-  const noPros = p => !p.prosp && (p.hkb||0) >= 500;
+  // HKB ≥ 500 preferred, but DYN Z > -0.5 catches players with missing HKB data
+  const noPros = p => !p.prosp && ((p.hkb||0) >= 500 || (p.dynZ||0) > -0.5);
 
   // ── Available pools ───────────────────────────────────────────────
   const C = CONSTITUTION;
