@@ -3203,7 +3203,7 @@ async function fetchPlayers() {
         num:    pi(cols[0]),
         name:   name,
         pos:    (cols[2] || '').trim(),
-        age:    pi(cols[3]),
+        age:    pf(cols[3]),
         team:   TEAM_OVERRIDES[cleanName(name)] || (cols[4] || '').trim(),
         type:   type,
         stat1:  pf(cols[6]),
@@ -3499,7 +3499,7 @@ function renderPlayerTable() {
           }">#${p.posRank||p.poolRk||'—'} ${p.posLabel||'pool'}</span>
         </div>
       </td>
-      <td class="mono" style="font-size:13px;color:${ageColor};font-weight:700">${p.age || '—'}</td>
+      <td class="mono" style="font-size:13px;color:${ageColor};font-weight:700">${p.age ? p.age.toFixed(1) : '—'}</td>
       <td class="mono" style="font-size:11px;color:var(--text-dim)">${p.team || '—'}</td>
       <td>${p.type === 'SP' ? '<span class="badge badge-aging">SP</span>' : p.type === 'RP' ? '<span class="badge badge-sell">RP</span>' : '<span class="badge badge-young">H</span>'}</td>
       <td class="mono" style="font-size:10px;color:var(--text-dim);white-space:nowrap">${statLine(p)}</td>
@@ -3689,7 +3689,7 @@ function renderMyRoster() {
             <td class="mono" style="font-size:10px;color:var(--text-muted)">${p.ovrRk || '—'}</td>
             <td style="font-weight:500;font-size:12px">${p.name} ${p.prosp ? '<span class="badge badge-prosp">PROSP</span>' : ''}</td>
             <td>${posPill(p.pos)}</td>
-            <td class="mono" style="font-size:11px">${p.age || '—'}</td>
+            <td class="mono" style="font-size:11px">${p.age ? p.age.toFixed(1) : '—'}</td>
             <td class="mono" style="font-size:10px;color:var(--text-dim)">${p.team || '—'}</td>
             <td class="mono" style="font-size:11px;color:var(--green);font-weight:600">${p.dynZ !== null ? fmtN(p.dynZ, 3) : '—'}</td>
             <td class="mono" style="font-size:11px;color:var(--purple)">${p.hkb > 0 ? fmtK(p.hkb) : '—'}</td>
@@ -4266,7 +4266,7 @@ function renderTakeCard() {
       border-radius:10px;background:rgba(0,0,0,0.3);border:1px solid ${rec.color};
       color:${rec.color};font-weight:600">${rec.tag}</span>
     ${p.team ? `<span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--text-muted)">${p.team}</span>` : ''}
-    ${p.age  ? `<span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--text-muted)">age ${p.age}</span>` : ''}
+    ${p.age  ? `<span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--text-muted)">age ${p.age.toFixed(1)}</span>` : ''}
     ${p.hkb  ? `<span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--purple);font-weight:600">HKB ${fmtK(p.hkb)}</span>` : ''}
   `;
   if (nameEl)  { nameEl.textContent  = p.name; nameEl.style.color = rec.color; }
@@ -4598,7 +4598,7 @@ function renderWaiverTable() {
       <td class="mono" style="font-size:10px;color:var(--text-muted)">${p.ovrRk||'—'}</td>
       <td style="font-weight:500;font-size:12px">${p.name} ${p.prosp?'<span class="badge badge-prosp">PROSP</span>':''}</td>
       <td>${posPill(p.pos)}</td>
-      <td class="mono" style="font-size:11px">${p.age||'—'}</td>
+      <td class="mono" style="font-size:11px">${p.age ? p.age.toFixed(1) : '—'}</td>
       <td class="mono" style="font-size:10px;color:var(--text-dim)">${p.team||'—'}</td>
       <td class="mono" style="font-size:9px;color:var(--text-muted);white-space:nowrap">${statLine(p)}</td>
       <td class="mono" style="font-size:11px;color:var(--green);font-weight:600">${p.dynZ!==null?fmtN(p.dynZ,3):'—'}</td>
