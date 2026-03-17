@@ -575,6 +575,7 @@
             <button class="filter-btn" onclick="setFilter('PROSP',this)">★ Prospects</button>
             <button class="filter-btn warn" onclick="toggleHideDrafted(this)">Hide Drafted</button>
             <button class="filter-btn" style="margin-left:auto" onclick="skipSuggestion()" title="Show next best TAKE suggestion">Skip Suggestion ›</button>
+            <button class="filter-btn" style="color:var(--text-muted);border-color:var(--text-muted)" onclick="ghostPick()" title="Player drafted not in board — advance pick counter">Ghost Pick 👻</button>
           </div>
           <div class="search-wrap">
             <input class="search-input" id="searchInput" type="text" placeholder="Search player name, team, position..." oninput="setSearch(this.value)" autocomplete="off">
@@ -3775,6 +3776,28 @@ function advancePick() {
     saveState();
     renderAll();
   }
+}
+
+function ghostPick() {
+  // Player drafted by opponent not in our board — prompt for name, advance counter
+  const name = prompt(
+    `Ghost Pick — Pick #${STATE.currentPick}\n\nEnter player name (for your records):\n(Leave blank to just advance the counter)`,
+    ''
+  );
+  if (name === null) return; // cancelled
+  const label = name.trim() || `Unknown Pick #${STATE.currentPick}`;
+  // Add to drafted set so it shows in counter, even if not in player list
+  STATE.drafted.add(label);
+  STATE.currentPick++;
+  STATE.skippedPlayers.clear();
+  saveState();
+  renderAll();
+  // Brief confirmation
+  const msg = document.createElement('div');
+  msg.textContent = `👻 Ghost pick recorded: ${label}`;
+  msg.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.85);color:var(--text-dim);padding:8px 18px;border-radius:8px;font-family:"IBM Plex Mono",monospace;font-size:11px;z-index:9999;pointer-events:none';
+  document.body.appendChild(msg);
+  setTimeout(() => msg.remove(), 2500);
 }
 
 function skipSuggestion() {
