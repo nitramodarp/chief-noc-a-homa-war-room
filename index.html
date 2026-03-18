@@ -3707,6 +3707,13 @@ async function fetchPlayers() {
     // Inject HKB values — sheet column Y takes priority, hardcoded table as fallback
     for (const p of players) {
       p.hkb = p.sheetHKB > 0 ? p.sheetHKB : lookupHKB(p.name);
+      p.hkbEstimated = false;
+      if (!p.hkb && p.dynZ != null && p.dynZ > -6) {
+        // Estimate HKB from DYN Z for players not in HKB database.
+        // Calibrated to scale: dynZ ~1 → ~1500, dynZ ~3 → ~3000, dynZ ~6 → ~5900
+        p.hkb = Math.round(Math.max(100, p.dynZ * 750 + 900));
+        p.hkbEstimated = true;
+      }
       p.ciely = lookupCiely(p.name);
 
       // ── INJECT CIELY 2026 DATA ─────────────────────────────────────
@@ -5118,7 +5125,7 @@ function renderWaiverTable() {
       <td class="mono" style="font-size:10px;color:var(--text-dim)">${p.team||'—'}</td>
       <td class="mono" style="font-size:9px;color:var(--text-muted);white-space:nowrap">${statLine(p)}</td>
       <td class="mono" style="font-size:11px;color:var(--green);font-weight:600">${p.dynZ!==null?fmtN(p.dynZ,3):'—'}</td>
-      <td class="mono" style="font-size:11px;color:var(--purple)">${p.hkb>0?fmtK(p.hkb):'—'}</td>
+      <td class="mono" style="font-size:11px;color:${p.hkbEstimated?'var(--text-muted)':'var(--purple)'}" title="${p.hkbEstimated?'Estimated from DYN Z — no HKB market data available':'HarryKnowsBall crowdsourced value'}">${p.hkb>0?(p.hkbEstimated?'~':'')+fmtK(p.hkb):'—'}</td>
       <td class="mono ${delta!==null?deltaClass(delta):''}" style="font-size:10px">${delta!==null?deltaLabel(delta):'—'}</td>
       <td style="font-size:9px;color:var(--text-muted);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.notes||''}</td>
     </tr>`;
@@ -5182,7 +5189,7 @@ function renderTradeAnalyzer() {
           <span style="flex:1;font-weight:500;font-size:11px">${p.name}</span>
           ${posPill(p.pos)}
           <span class="mono" style="font-size:9px;color:var(--green)">${fmtN(p.dynZ,2)}</span>
-          <span class="mono" style="font-size:9px;color:var(--purple)">${p.hkb?fmtK(p.hkb):'—'}</span>
+          <span class="mono" style="font-size:9px;color:${p.hkbEstimated?'var(--text-muted)':'var(--purple)'}" title="${p.hkbEstimated?'Est. from DYN Z':''}">${p.hkb?(p.hkbEstimated?'~':'')+fmtK(p.hkb):'—'}</span>
           ${delta !== null ? `<span class="mono ${deltaClass(delta)}" style="font-size:9px">${deltaLabel(delta)}</span>` : ''}
           <button class="remove-x" onclick="tradeRemove('${side}','${esc(name)}')">×</button>
         </div>`;
