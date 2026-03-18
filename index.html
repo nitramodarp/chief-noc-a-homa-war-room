@@ -3013,6 +3013,7 @@ const TEAM_OVERRIDES = {
 const NOTES_OVERRIDES = {
   'aj minter':      '⚠️ IL to start 2026 — torn lat surgery May 2025. Return ~May. 3 live BPs, 93mph. High-leverage setup when healthy.',
   'zach neto':      '⚠️ Wrist sprain Mar 14 (headfirst slide) — no fracture, day-to-day, Ready Opening Day. 3rd hand/wrist injury in 12 months. Injury pattern risk.',
+  'corbin carroll': '⚠️ Broken hamate bone (right hand) Feb 11 — surgery Feb 12. Making ST debut as DH mid-Mar. Expected ready Opening Day but power may lag. Hamate = power suppressor 1-2 months.',
   'bryan woo':      'Healthy for 2026 — pec issue ended 2025 late. Skipped WBC to protect arm. Targeting 200 IP as SEA ace. Ciely #4 SP.',
   'seiya suzuki':   '⚠️ Right knee WBC injury Mar 14 — walked off under own power. Awaiting diagnosis. Possible IL to start season.',
   'josh hader':     '⚠️ Arm injury nursing — mentioned as concern heading into 2026. Monitor before drafting.',
@@ -3021,6 +3022,7 @@ const NOTES_OVERRIDES = {
 const FLAG_OVERRIDES = {
   'aj minter':      '⚠️ IL — May return',
   'zach neto':      '⚠️ Injury pattern — wrist x3',
+  'corbin carroll': '⚠️ Hamate surgery — power risk',
   'seiya suzuki':   '⚠️ Knee — WBC injury',
   'josh hader':     '⚠️ Arm concern',
   'joe ryan':       '⚠️ Back inflammation — ST scare',
@@ -3274,6 +3276,333 @@ async function fetchPlayers() {
         prosp: false, flag: '', sheetHKB: 0,
         notes: 'Healthy for 2026 — pec issue ended 2025 late. Skipped WBC to protect arm. Targeting 200 IP as SEA ace.',
       });
+    }
+    // Ezequiel Tovar — COL SS, not in sheet.
+    if (!players.find(p => cleanName(p.name) === 'ezequiel tovar')) {
+      players.push({
+        num: 0, name: 'Ezequiel Tovar', pos: 'SS', age: 23.5, team: 'COL', type: 'H',
+        stat1: 74.9,    // R
+        stat2: 20.0,    // HR
+        stat3: 73.9,    // RBI
+        stat4: 9.2,     // SB
+        stat5: 0.733,   // OPS
+        rawZ: 0.0, dynZ: 0.0,
+        poolRk: 0, ovrRk: 253,
+        prosp: false, flag: '', sheetHKB: 0,
+        notes: 'COL SS, age 23 — Coors drag on ratios but counting stat upside. HKB 1.2k.',
+      });
+    }
+    if (!players.find(p => cleanName(p.name) === 'kyle schwarber')) {
+      players.push({ num:0, name:'Kyle Schwarber', pos:'OF', age:33.0, team:'PHI', type:'H',
+        stat1:96.2, stat2:41.0, stat3:101.0, stat4:6.0, stat5:0.843,
+        rawZ:2.501, dynZ:2.501, poolRk:0, ovrRk:27,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #27 · SD 6.25' }); // R=96.2 HR=41.0 RBI=101.0 SB=6.0 OPS=0.843
+    }
+    if (!players.find(p => cleanName(p.name) === 'brice turang')) {
+      players.push({ num:0, name:'Brice Turang', pos:'2B', age:25.3, team:'MIL', type:'H',
+        stat1:77.3, stat2:14.0, stat3:62.3, stat4:29.0, stat5:0.712,
+        rawZ:1.798, dynZ:1.798, poolRk:0, ovrRk:34,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #34 · SD 4.5' }); // R=77.3 HR=14.0 RBI=62.3 SB=29.0 OPS=0.712
+    }
+    if (!players.find(p => cleanName(p.name) === 'maikel garcia')) {
+      players.push({ num:0, name:'Maikel Garcia', pos:'3B', age:26.0, team:'KC', type:'H',
+        stat1:81.2, stat2:12.9, stat3:65.8, stat4:26.0, stat5:0.74,
+        rawZ:2.081, dynZ:2.081, poolRk:0, ovrRk:35,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #35 · SD 5.2' }); // R=81.2 HR=12.9 RBI=65.8 SB=26.0 OPS=0.74
+    }
+    if (!players.find(p => cleanName(p.name) === 'byron buxton')) {
+      players.push({ num:0, name:'Byron Buxton', pos:'OF', age:32.2, team:'MIN', type:'H',
+        stat1:76.9, stat2:27.5, stat3:73.3, stat4:15.4, stat5:0.799,
+        rawZ:1.823, dynZ:1.823, poolRk:0, ovrRk:61,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #61 · SD 4.56' }); // R=76.9 HR=27.5 RBI=73.3 SB=15.4 OPS=0.799
+    }
+    if (!players.find(p => cleanName(p.name) === 'george springer')) {
+      players.push({ num:0, name:'George Springer', pos:'OF', age:36.5, team:'TOR', type:'H',
+        stat1:80.8, stat2:24.0, stat3:72.7, stat4:13.0, stat5:0.786,
+        rawZ:1.794, dynZ:1.794, poolRk:0, ovrRk:65,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #65 · SD 4.48' }); // R=80.8 HR=24.0 RBI=72.7 SB=13.0 OPS=0.786
+    }
+    if (!players.find(p => cleanName(p.name) === 'jesus luzardo')) {
+      players.push({ num:0, name:'Jesus Luzardo', pos:'SP', age:28.5, team:'PHI', type:'SP',
+        stat1:194.7, stat2:3.635, stat3:1.179, stat4:0, stat5:0,
+        rawZ:1.854, dynZ:1.854, poolRk:0, ovrRk:66,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #66 · SD 4.64' }); // K=194.7 ERA=3.635 WHIP=1.179
+    }
+    if (!players.find(p => cleanName(p.name) === 'randy arozarena')) {
+      players.push({ num:0, name:'Randy Arozarena', pos:'OF', age:31.0, team:'SEA', type:'H',
+        stat1:82.2, stat2:22.0, stat3:73.8, stat4:23.1, stat5:0.719,
+        rawZ:1.683, dynZ:1.683, poolRk:0, ovrRk:70,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #70 · SD 4.21' }); // R=82.2 HR=22.0 RBI=73.8 SB=23.1 OPS=0.719
+    }
+    if (!players.find(p => cleanName(p.name) === 'xavier edwards')) {
+      players.push({ num:0, name:'Xavier Edwards', pos:'2B', age:25.6, team:'MIA', type:'H',
+        stat1:67.4, stat2:4.0, stat3:44.2, stat4:26.8, stat5:0.7,
+        rawZ:1.178, dynZ:1.178, poolRk:0, ovrRk:71,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #71 · SD 2.94' }); // R=67.4 HR=4.0 RBI=44.2 SB=26.8 OPS=0.7
+    }
+    if (!players.find(p => cleanName(p.name) === 'luke keaschall')) {
+      players.push({ num:0, name:'Luke Keaschall', pos:'2B', age:23.7, team:'MIN', type:'H',
+        stat1:66.1, stat2:11.1, stat3:54.6, stat4:22.2, stat5:0.734,
+        rawZ:1.162, dynZ:1.162, poolRk:0, ovrRk:72,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #72 · SD 2.9' }); // R=66.1 HR=11.1 RBI=54.6 SB=22.2 OPS=0.734
+    }
+    if (!players.find(p => cleanName(p.name) === 'bryson stott')) {
+      players.push({ num:0, name:'Bryson Stott', pos:'2B', age:28.4, team:'PHI', type:'H',
+        stat1:66.2, stat2:13.0, stat3:57.8, stat4:23.0, stat5:0.709,
+        rawZ:1.108, dynZ:1.108, poolRk:0, ovrRk:76,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #76 · SD 2.77' }); // R=66.2 HR=13.0 RBI=57.8 SB=23.0 OPS=0.709
+    }
+    if (!players.find(p => cleanName(p.name) === 'oneil cruz')) {
+      players.push({ num:0, name:'Oneil Cruz', pos:'OF', age:27.4, team:'PIT', type:'H',
+        stat1:70.6, stat2:21.7, stat3:63.8, stat4:26.8, stat5:0.757,
+        rawZ:1.525, dynZ:1.525, poolRk:0, ovrRk:78,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #78 · SD 3.81' }); // R=70.6 HR=21.7 RBI=63.8 SB=26.8 OPS=0.757
+    }
+    if (!players.find(p => cleanName(p.name) === 'jeremy pena')) {
+      players.push({ num:0, name:'Jeremy Pena', pos:'SS', age:28.5, team:'HOU', type:'H',
+        stat1:78.3, stat2:17.5, stat3:68.0, stat4:17.3, stat5:0.741,
+        rawZ:1.882, dynZ:1.882, poolRk:0, ovrRk:84,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #84 · SD 4.71' }); // R=78.3 HR=17.5 RBI=68.0 SB=17.3 OPS=0.741
+    }
+    if (!players.find(p => cleanName(p.name) === 'christian yelich')) {
+      players.push({ num:0, name:'Christian Yelich', pos:'OF', age:34.3, team:'MIL', type:'H',
+        stat1:70.6, stat2:18.4, stat3:69.8, stat4:16.0, stat5:0.758,
+        rawZ:1.381, dynZ:1.381, poolRk:0, ovrRk:87,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #87 · SD 3.45' }); // R=70.6 HR=18.4 RBI=69.8 SB=16.0 OPS=0.758
+    }
+    if (!players.find(p => cleanName(p.name) === 'andy pages')) {
+      players.push({ num:0, name:'Andy Pages', pos:'OF', age:25.3, team:'LAD', type:'H',
+        stat1:71.4, stat2:23.0, stat3:75.9, stat4:9.1, stat5:0.752,
+        rawZ:1.359, dynZ:1.359, poolRk:0, ovrRk:89,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #89 · SD 3.4' }); // R=71.4 HR=23.0 RBI=75.9 SB=9.1 OPS=0.752
+    }
+    if (!players.find(p => cleanName(p.name) === 'taylor ward')) {
+      players.push({ num:0, name:'Taylor Ward', pos:'OF', age:32.3, team:'BAL', type:'H',
+        stat1:80.9, stat2:26.8, stat3:81.9, stat4:5.0, stat5:0.762,
+        rawZ:1.312, dynZ:1.312, poolRk:0, ovrRk:94,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #94 · SD 3.28' }); // R=80.9 HR=26.8 RBI=81.9 SB=5.0 OPS=0.762
+    }
+    if (!players.find(p => cleanName(p.name) === 'luis garcia')) {
+      players.push({ num:0, name:'Luis Garcia', pos:'2B', age:25.8, team:'WSH', type:'H',
+        stat1:55.7, stat2:15.0, stat3:60.4, stat4:13.0, stat5:0.737,
+        rawZ:0.847, dynZ:0.847, poolRk:0, ovrRk:99,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #99 · SD 2.12' }); // R=55.7 HR=15.0 RBI=60.4 SB=13.0 OPS=0.737
+    }
+    if (!players.find(p => cleanName(p.name) === 'jo adell')) {
+      players.push({ num:0, name:'Jo Adell', pos:'OF', age:26.9, team:'LAA', type:'H',
+        stat1:68.6, stat2:29.9, stat3:79.5, stat4:9.0, stat5:0.757,
+        rawZ:1.275, dynZ:1.275, poolRk:0, ovrRk:100,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #100 · SD 3.19' }); // R=68.6 HR=29.9 RBI=79.5 SB=9.0 OPS=0.757
+    }
+    if (!players.find(p => cleanName(p.name) === 'tyler soderstrom')) {
+      players.push({ num:0, name:'Tyler Soderstrom', pos:'OF', age:24.3, team:'ATH', type:'H',
+        stat1:71.7, stat2:24.0, stat3:77.1, stat4:5.0, stat5:0.781,
+        rawZ:1.246, dynZ:1.246, poolRk:0, ovrRk:104,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #104 · SD 3.11' }); // R=71.7 HR=24.0 RBI=77.1 SB=5.0 OPS=0.781
+    }
+    if (!players.find(p => cleanName(p.name) === 'matt chapman')) {
+      players.push({ num:0, name:'Matt Chapman', pos:'3B', age:32.9, team:'SF', type:'H',
+        stat1:78.3, stat2:24.0, stat3:76.0, stat4:9.0, stat5:0.755,
+        rawZ:1.113, dynZ:1.113, poolRk:0, ovrRk:111,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #111 · SD 2.78' }); // R=78.3 HR=24.0 RBI=76.0 SB=9.0 OPS=0.755
+    }
+    if (!players.find(p => cleanName(p.name) === 'wilyer abreu')) {
+      players.push({ num:0, name:'Wilyer Abreu', pos:'OF', age:26.6, team:'BOS', type:'H',
+        stat1:71.3, stat2:23.7, stat3:76.7, stat4:9.5, stat5:0.769,
+        rawZ:1.201, dynZ:1.201, poolRk:0, ovrRk:112,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #112 · SD 3.0' }); // R=71.3 HR=23.7 RBI=76.7 SB=9.5 OPS=0.769
+    }
+    if (!players.find(p => cleanName(p.name) === 'chandler simpson')) {
+      players.push({ num:0, name:'Chandler Simpson', pos:'OF', age:26.8, team:'TB', type:'H',
+        stat1:51.2, stat2:1.0, stat3:31.9, stat4:39.6, stat5:0.665,
+        rawZ:1.197, dynZ:1.197, poolRk:0, ovrRk:113,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #113 · SD 2.99' }); // R=51.2 HR=1.0 RBI=31.9 SB=39.6 OPS=0.665
+    }
+    if (!players.find(p => cleanName(p.name) === 'lawrence butler')) {
+      players.push({ num:0, name:'Lawrence Butler', pos:'OF', age:25.7, team:'ATH', type:'H',
+        stat1:70.3, stat2:20.8, stat3:65.4, stat4:17.8, stat5:0.739,
+        rawZ:1.171, dynZ:1.171, poolRk:0, ovrRk:114,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #114 · SD 2.93' }); // R=70.3 HR=20.8 RBI=65.4 SB=17.8 OPS=0.739
+    }
+    if (!players.find(p => cleanName(p.name) === 'alec burleson')) {
+      players.push({ num:0, name:'Alec Burleson', pos:'OF', age:27.3, team:'STL', type:'H',
+        stat1:65.8, stat2:19.1, stat3:72.4, stat4:6.0, stat5:0.751,
+        rawZ:1.165, dynZ:1.165, poolRk:0, ovrRk:116,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #116 · SD 2.91' }); // R=65.8 HR=19.1 RBI=72.4 SB=6.0 OPS=0.751
+    }
+    if (!players.find(p => cleanName(p.name) === 'brenton doyle')) {
+      players.push({ num:0, name:'Brenton Doyle', pos:'OF', age:27.8, team:'COL', type:'H',
+        stat1:66.4, stat2:18.1, stat3:63.4, stat4:20.0, stat5:0.711,
+        rawZ:1.163, dynZ:1.163, poolRk:0, ovrRk:117,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #117 · SD 2.91' }); // R=66.4 HR=18.1 RBI=63.4 SB=20.0 OPS=0.711
+    }
+    if (!players.find(p => cleanName(p.name) === 'hunter goodman')) {
+      players.push({ num:0, name:'Hunter Goodman', pos:'C', age:26.4, team:'COL', type:'H',
+        stat1:68.8, stat2:27.1, stat3:82.9, stat4:2.0, stat5:0.783,
+        rawZ:1.289, dynZ:1.289, poolRk:0, ovrRk:126,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #126 · SD 3.22' }); // R=68.8 HR=27.1 RBI=82.9 SB=2.0 OPS=0.783
+    }
+    if (!players.find(p => cleanName(p.name) === 'trevor story')) {
+      players.push({ num:0, name:'Trevor Story', pos:'SS', age:33.3, team:'BOS', type:'H',
+        stat1:69.6, stat2:19.9, stat3:69.0, stat4:22.1, stat5:0.71,
+        rawZ:1.497, dynZ:1.497, poolRk:0, ovrRk:128,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #128 · SD 3.74' }); // R=69.6 HR=19.9 RBI=69.0 SB=22.1 OPS=0.71
+    }
+    if (!players.find(p => cleanName(p.name) === 'heliot ramos')) {
+      players.push({ num:0, name:'Heliot Ramos', pos:'OF', age:26.5, team:'SF', type:'H',
+        stat1:71.6, stat2:21.0, stat3:70.3, stat4:6.0, stat5:0.737,
+        rawZ:0.974, dynZ:0.974, poolRk:0, ovrRk:134,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #134 · SD 2.44' }); // R=71.6 HR=21.0 RBI=70.3 SB=6.0 OPS=0.737
+    }
+    if (!players.find(p => cleanName(p.name) === 'daniel palencia')) {
+      players.push({ num:0, name:'Daniel Palencia', pos:'RP', age:26.2, team:'CHC', type:'RP',
+        stat1:75.1, stat2:3.574, stat3:1.235, stat4:0, stat5:0,
+        rawZ:0.943, dynZ:0.943, poolRk:0, ovrRk:140,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #140 · SD 2.36' }); // K=75.1 ERA=3.574 WHIP=1.235
+    }
+    if (!players.find(p => cleanName(p.name) === 'salvador perez')) {
+      players.push({ num:0, name:'Salvador Perez', pos:'C', age:35.9, team:'KC', type:'H',
+        stat1:65.1, stat2:27.0, stat3:86.1, stat4:0.0, stat5:0.743,
+        rawZ:1.097, dynZ:1.097, poolRk:0, ovrRk:143,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #143 · SD 2.74' }); // R=65.1 HR=27.0 RBI=86.1 SB=0.0 OPS=0.743
+    }
+    if (!players.find(p => cleanName(p.name) === 'jakob marsee')) {
+      players.push({ num:0, name:'Jakob Marsee', pos:'OF', age:25.6, team:'MIA', type:'H',
+        stat1:68.7, stat2:12.1, stat3:51.1, stat4:32.3, stat5:0.681,
+        rawZ:0.861, dynZ:0.861, poolRk:0, ovrRk:146,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #146 · SD 2.15' }); // R=68.7 HR=12.1 RBI=51.1 SB=32.3 OPS=0.681
+    }
+    if (!players.find(p => cleanName(p.name) === 'ivan herrera')) {
+      players.push({ num:0, name:'Ivan Herrera', pos:'C', age:25.8, team:'STL', type:'H',
+        stat1:67.6, stat2:17.7, stat3:63.6, stat4:8.1, stat5:0.777,
+        rawZ:1.047, dynZ:1.047, poolRk:0, ovrRk:153,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #153 · SD 2.62' }); // R=67.6 HR=17.7 RBI=63.6 SB=8.1 OPS=0.777
+    }
+    if (!players.find(p => cleanName(p.name) === 'adolis garcia')) {
+      players.push({ num:0, name:'Adolis Garcia', pos:'OF', age:34.0, team:'PHI', type:'H',
+        stat1:64.8, stat2:23.1, stat3:73.6, stat4:11.0, stat5:0.712,
+        rawZ:0.797, dynZ:0.797, poolRk:0, ovrRk:156,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #156 · SD 1.99' }); // R=64.8 HR=23.1 RBI=73.6 SB=11.0 OPS=0.712
+    }
+    if (!players.find(p => cleanName(p.name) === 'kerry carpenter')) {
+      players.push({ num:0, name:'Kerry Carpenter', pos:'OF', age:28.5, team:'DET', type:'H',
+        stat1:63.4, stat2:24.7, stat3:70.5, stat4:3.0, stat5:0.771,
+        rawZ:0.782, dynZ:0.782, poolRk:0, ovrRk:158,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #158 · SD 1.96' }); // R=63.4 HR=24.7 RBI=70.5 SB=3.0 OPS=0.771
+    }
+    if (!players.find(p => cleanName(p.name) === 'ben rice')) {
+      players.push({ num:0, name:'Ben Rice', pos:'C', age:25.6, team:'NYY', type:'H',
+        stat1:71.5, stat2:25.5, stat3:73.1, stat4:4.7, stat5:0.793,
+        rawZ:1.011, dynZ:1.011, poolRk:0, ovrRk:159,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #159 · SD 2.53' }); // R=71.5 HR=25.5 RBI=73.1 SB=4.7 OPS=0.793
+    }
+    if (!players.find(p => cleanName(p.name) === 'mickey moniak')) {
+      players.push({ num:0, name:'Mickey Moniak', pos:'OF', age:27.8, team:'COL', type:'H',
+        stat1:60.2, stat2:19.3, stat3:63.1, stat4:9.0, stat5:0.762,
+        rawZ:0.764, dynZ:0.764, poolRk:0, ovrRk:163,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #163 · SD 1.91' }); // R=60.2 HR=19.3 RBI=63.1 SB=9.0 OPS=0.762
+    }
+    if (!players.find(p => cleanName(p.name) === 'ranger suarez')) {
+      players.push({ num:0, name:'Ranger Suarez', pos:'SP', age:30.6, team:'BOS', type:'SP',
+        stat1:148.9, stat2:3.769, stat3:1.257, stat4:0, stat5:0,
+        rawZ:0.803, dynZ:0.803, poolRk:0, ovrRk:164,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #164 · SD 2.01' }); // K=148.9 ERA=3.769 WHIP=1.257
+    }
+    if (!players.find(p => cleanName(p.name) === 'kyle stowers')) {
+      players.push({ num:0, name:'Kyle Stowers', pos:'OF', age:28.2, team:'MIA', type:'H',
+        stat1:68.1, stat2:24.1, stat3:75.6, stat4:4.0, stat5:0.755,
+        rawZ:0.733, dynZ:0.733, poolRk:0, ovrRk:165,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #165 · SD 1.83' }); // R=68.1 HR=24.1 RBI=75.6 SB=4.0 OPS=0.755
+    }
+    if (!players.find(p => cleanName(p.name) === 'kazuma okamoto')) {
+      players.push({ num:0, name:'Kazuma Okamoto', pos:'3B', age:26.6, team:'TOR', type:'H',
+        stat1:68.0, stat2:24.1, stat3:74.0, stat4:2.1, stat5:0.759,
+        rawZ:0.613, dynZ:0.613, poolRk:0, ovrRk:167,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #167 · SD 1.53' }); // R=68.0 HR=24.1 RBI=74.0 SB=2.1 OPS=0.759
+    }
+    if (!players.find(p => cleanName(p.name) === 'jordan beck')) {
+      players.push({ num:0, name:'Jordan Beck', pos:'OF', age:25.6, team:'COL', type:'H',
+        stat1:62.4, stat2:15.8, stat3:60.1, stat4:15.8, stat5:0.721,
+        rawZ:0.704, dynZ:0.704, poolRk:0, ovrRk:168,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #168 · SD 1.76' }); // R=62.4 HR=15.8 RBI=60.1 SB=15.8 OPS=0.721
+    }
+    if (!players.find(p => cleanName(p.name) === 'daylen lile')) {
+      players.push({ num:0, name:'Daylen Lile', pos:'OF', age:22.8, team:'WSH', type:'H',
+        stat1:62.6, stat2:10.1, stat3:56.6, stat4:14.0, stat5:0.726,
+        rawZ:0.683, dynZ:0.683, poolRk:0, ovrRk:169,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #169 · SD 1.71' }); // R=62.6 HR=10.1 RBI=56.6 SB=14.0 OPS=0.726
+    }
+    if (!players.find(p => cleanName(p.name) === 'noelvi marte')) {
+      players.push({ num:0, name:'Noelvi Marte', pos:'OF', age:24.4, team:'CIN', type:'H',
+        stat1:60.3, stat2:16.3, stat3:59.5, stat4:14.4, stat5:0.715,
+        rawZ:0.66, dynZ:0.66, poolRk:0, ovrRk:172,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #172 · SD 1.65' }); // R=60.3 HR=16.3 RBI=59.5 SB=14.4 OPS=0.715
+    }
+    if (!players.find(p => cleanName(p.name) === 'ryan walker')) {
+      players.push({ num:0, name:'Ryan Walker', pos:'RP', age:31.8, team:'SF', type:'RP',
+        stat1:66.4, stat2:3.558, stat3:1.206, stat4:0, stat5:0,
+        rawZ:0.683, dynZ:0.683, poolRk:0, ovrRk:174,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #174 · SD 1.71' }); // K=66.4 ERA=3.558 WHIP=1.206
+    }
+    if (!players.find(p => cleanName(p.name) === 'trevor megill')) {
+      players.push({ num:0, name:'Trevor Megill', pos:'RP', age:32.3, team:'MIL', type:'RP',
+        stat1:79.3, stat2:3.481, stat3:1.176, stat4:0, stat5:0,
+        rawZ:0.671, dynZ:0.671, poolRk:0, ovrRk:176,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #176 · SD 1.68' }); // K=79.3 ERA=3.481 WHIP=1.176
+    }
+    if (!players.find(p => cleanName(p.name) === 'dansby swanson')) {
+      players.push({ num:0, name:'Dansby Swanson', pos:'SS', age:32.1, team:'CHC', type:'H',
+        stat1:72.1, stat2:20.1, stat3:70.9, stat4:15.0, stat5:0.706,
+        rawZ:1.089, dynZ:1.089, poolRk:0, ovrRk:178,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #178 · SD 2.72' }); // R=72.1 HR=20.1 RBI=70.9 SB=15.0 OPS=0.706
+    }
+    if (!players.find(p => cleanName(p.name) === 'carlos rodon')) {
+      players.push({ num:0, name:'Carlos Rodon', pos:'SP', age:33.3, team:'NYY', type:'SP',
+        stat1:154.7, stat2:4.044, stat3:1.224, stat4:0, stat5:0,
+        rawZ:0.642, dynZ:0.642, poolRk:0, ovrRk:186,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #186 · SD 1.6' }); // K=154.7 ERA=4.044 WHIP=1.224
+    }
+    if (!players.find(p => cleanName(p.name) === 'michael busch')) {
+      players.push({ num:0, name:'Michael Busch', pos:'1B', age:25.3, team:'CHC', type:'H',
+        stat1:74.3, stat2:25.1, stat3:75.3, stat4:3.0, stat5:0.777,
+        rawZ:0.985, dynZ:0.985, poolRk:0, ovrRk:188,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #188 · SD 2.46' }); // R=74.3 HR=25.1 RBI=75.3 SB=3.0 OPS=0.777
+    }
+    if (!players.find(p => cleanName(p.name) === 'munetaka murakami')) {
+      players.push({ num:0, name:'Munetaka Murakami', pos:'1B', age:25.8, team:'CWS', type:'H',
+        stat1:74.8, stat2:29.8, stat3:78.3, stat4:10.2, stat5:0.767,
+        rawZ:0.966, dynZ:0.966, poolRk:0, ovrRk:190,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #190 · SD 2.41' }); // R=74.8 HR=29.8 RBI=78.3 SB=10.2 OPS=0.767
+    }
+    if (!players.find(p => cleanName(p.name) === 'will smith')) {
+      players.push({ num:0, name:'Will Smith', pos:'C', age:31.0, team:'LAD', type:'H',
+        stat1:66.9, stat2:19.9, stat3:66.9, stat4:3.0, stat5:0.803,
+        rawZ:0.741, dynZ:0.741, poolRk:0, ovrRk:191,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #191 · SD 1.85' }); // R=66.9 HR=19.9 RBI=66.9 SB=3.0 OPS=0.803
+    }
+    if (!players.find(p => cleanName(p.name) === 'yainer diaz')) {
+      players.push({ num:0, name:'Yainer Diaz', pos:'C', age:27.5, team:'HOU', type:'H',
+        stat1:58.0, stat2:18.1, stat3:66.1, stat4:1.9, stat5:0.74,
+        rawZ:0.657, dynZ:0.657, poolRk:0, ovrRk:198,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #198 · SD 1.64' }); // R=58.0 HR=18.1 RBI=66.1 SB=1.9 OPS=0.74
+    }
+    if (!players.find(p => cleanName(p.name) === 'brandon lowe')) {
+      players.push({ num:0, name:'Brandon Lowe', pos:'2B', age:31.7, team:'TB', type:'H',
+        stat1:55.0, stat2:20.0, stat3:65.0, stat4:8.0, stat5:0.76,
+        rawZ:0.578, dynZ:0.578, poolRk:0, ovrRk:129,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #129 · SD 1.445' });
+    }
+    if (!players.find(p => cleanName(p.name) === 'andres gimenez')) {
+      players.push({ num:0, name:'Andres Gimenez', pos:'2B', age:27.5, team:'CLE', type:'H',
+        stat1:55.0, stat2:13.0, stat3:55.0, stat4:12.0, stat5:0.712,
+        rawZ:0.557, dynZ:0.557, poolRk:0, ovrRk:130,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #130 · SD 1.392' });
+    }
+    if (!players.find(p => cleanName(p.name) === 'matt mclain')) {
+      players.push({ num:0, name:'Matt McLain', pos:'2B', age:25.6, team:'CIN', type:'H',
+        stat1:52.0, stat2:14.0, stat3:55.0, stat4:15.0, stat5:0.73,
+        rawZ:0.418, dynZ:0.418, poolRk:0, ovrRk:147,
+        prosp:false, flag:'', sheetHKB:0, notes:'Ciely #147 · SD 1.046' });
     }
     // ─────────────────────────────────────────────────────────────────
 
