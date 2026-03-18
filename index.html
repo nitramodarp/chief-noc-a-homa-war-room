@@ -3044,14 +3044,14 @@ const ROSTER_SLOTS = [
   {id:'SP2',  label:'SP',           posTypes:['SP'],          cls:'',       role:'Solid #2 SP'},
   {id:'RP1',  label:'RP',           posTypes:['RP'],          cls:'',       role:'Elite Closer #1'},
   {id:'RP2',  label:'RP',           posTypes:['RP'],          cls:'',       role:'Elite Closer #2'},
-  {id:'P1',   label:'P-FLEX · SP3', posTypes:['SP'],          cls:'pflex',  role:'SP3 — Young K-arm'},
-  {id:'P2',   label:'P-FLEX · CL',  posTypes:['RP'],          cls:'pflex',  role:'Closer #3 — SVH+ratios'},
-  {id:'P3',   label:'P-FLEX · CL',  posTypes:['RP'],          cls:'pflex',  role:'Closer #4 — handcuff'},
+  {id:'P1',   label:'P-FLEX · CL',  posTypes:['RP'],          cls:'pflex',  role:'Closer #3 — parked elite SV+H'},
+  {id:'P2',   label:'P-FLEX · CL',  posTypes:['RP'],          cls:'pflex',  role:'Closer #4 — parked elite SV+H'},
+  {id:'P3',   label:'P-FLEX · SWING',posTypes:['RP','SP'],     cls:'pflex',  role:'Swing slot — 5th closer OR 6th SP'},
   // ── BENCH (4) ───────────────────────────────────────────────────
-  {id:'BN1',  label:'BN · SP',      posTypes:['SP'],          cls:'',       role:'SP bench — injury buffer'},
-  {id:'BN2',  label:'BN · H',       posTypes:['H'],           cls:'',       role:'Multi-pos hitter depth'},
-  {id:'BN3',  label:'BN · H',       posTypes:['H'],           cls:'',       role:'Speed specialist — SB depth'},
-  {id:'BN4',  label:'BN · H',       posTypes:['H'],           cls:'',       role:'Power depth — HR/RBI insurance'},
+  {id:'BN1',  label:'BN · SP',      posTypes:['SP'],          cls:'',       role:'SP rotation — daily swap'},
+  {id:'BN2',  label:'BN · SP',      posTypes:['SP'],          cls:'',       role:'SP rotation — daily swap'},
+  {id:'BN3',  label:'BN · SP',      posTypes:['SP'],          cls:'',       role:'SP rotation — daily swap'},
+  {id:'BN4',  label:'BN · H',       posTypes:['H'],           cls:'',       role:'Hitter bench — 1 slot (wire covers rest)'},
   // ── IL (5) ──────────────────────────────────────────────────────
   {id:'IL1',  label:'IL',           posTypes:['H','SP','RP'], cls:'',       role:'Injured List'},
   {id:'IL2',  label:'IL',           posTypes:['H','SP','RP'], cls:'',       role:'Injured List'},
@@ -4253,22 +4253,20 @@ function autoAssignSlot(player) {
   const rpFilled  = my.filter(p=>p.type==='RP').length;
   const bnSPFilled = my.filter(p=>p.type==='SP'&&STATE.rosterSlots['BN1']===p.name).length;
 
-  // SP assignment: SP1 → SP2 → P1(SP3) → BN1 → bench overflow
+  // SP assignment: SP1 → SP2 → BN1 → BN2 → BN3 (daily rotation room)
   if (type === 'SP') {
-    const spOrder = ['SP1','SP2','P1','BN1'];
+    const spOrder = ['SP1','SP2','BN1','BN2','BN3'];
     for (const sid of spOrder) {
       if (!STATE.rosterSlots[sid]) { STATE.rosterSlots[sid] = player.name; return; }
     }
-    // All SP slots full — overflow to hitter bench (shouldn't happen with constitution)
-    for (const sid of ['BN2','BN3','BN4','BN5']) {
-      if (!STATE.rosterSlots[sid]) { STATE.rosterSlots[sid] = player.name; return; }
-    }
+    // All SP slots full — overflow to BN4 as last resort
+    if (!STATE.rosterSlots['BN4']) { STATE.rosterSlots['BN4'] = player.name; return; }
     return;
   }
 
-  // RP assignment: RP1 → RP2 → P2 → P3 — NEVER bench
+  // RP assignment: RP1 → RP2 → P1 → P2 (parked closers) → P3 (swing slot) — NEVER bench
   if (type === 'RP') {
-    const rpOrder = ['RP1','RP2','P2','P3'];
+    const rpOrder = ['RP1','RP2','P1','P2','P3'];
     for (const sid of rpOrder) {
       if (!STATE.rosterSlots[sid]) { STATE.rosterSlots[sid] = player.name; return; }
     }
@@ -4276,17 +4274,17 @@ function autoAssignSlot(player) {
     return;
   }
 
-  // Hitter assignment by position priority
+  // Hitter assignment — only BN4 available on bench (daily league uses wire for depth)
   const priority = {
-    'C':   ['C',   'UTIL','BN2','BN3','BN4','BN5'],
-    '1B':  ['1B',  'UTIL','BN2','BN3','BN4','BN5'],
-    '2B':  ['2B',  'UTIL','BN2','BN3','BN4','BN5'],
-    '3B':  ['3B',  'UTIL','BN2','BN3','BN4','BN5'],
-    'SS':  ['SS',  'UTIL','BN2','BN3','BN4','BN5'],
-    'OF':  ['OF1','OF2','OF3','UTIL','BN2','BN3','BN4','BN5'],
-    'DH':  ['UTIL','BN2','BN3','BN4','BN5'],
+    'C':   ['C',   'UTIL','BN4'],
+    '1B':  ['1B',  'UTIL','BN4'],
+    '2B':  ['2B',  'UTIL','BN4'],
+    '3B':  ['3B',  'UTIL','BN4'],
+    'SS':  ['SS',  'UTIL','BN4'],
+    'OF':  ['OF1','OF2','OF3','UTIL','BN4'],
+    'DH':  ['UTIL','BN4'],
   };
-  const candidates = priority[pos] || ['UTIL','BN2','BN3','BN4','BN5'];
+  const candidates = priority[pos] || ['UTIL','BN4'];
 
   // Check multi-pos eligibility — try each eligible position
   const eligiblePos = player.pos.split('/');
@@ -4309,25 +4307,28 @@ function autoAssignSlot(player) {
 }
 
 // ════════════════════════════════════════════════════════════════════
-// DRAFT CONSTITUTION — Chief Noc-A-Homa · Final · Split B
+// DRAFT CONSTITUTION — Chief Noc-A-Homa · Final · Split B · DAILY LEAGUE
 // ────────────────────────────────────────────────────────────────────
-// ACTIVE:  C·1B·2B·3B·SS·OF×3·UTIL | SP1·SP2·RP1·RP2·P1(SP3)·P2(CL)·P3(CL)
-// BENCH:   BN1(SP) · BN2-4(H) · NA×5 (prospects, age ≤22) · IL×5
-// RULES:   4 SPs total (SP1·SP2·P1·BN1) | 4 closers (RP1·RP2·P2·P3)
+// ACTIVE:  C·1B·2B·3B·SS·OF×3·UTIL | SP1·SP2·RP1·RP2·P1(CL)·P2(CL)·P3(CL/SP)
+// BENCH:   BN1(SP)·BN2(SP)·BN3(SP) · BN4(H) · NA×5 (prospects) · IL×5
+// RULES:   5-6 SPs total (SP1·SP2·BN1·BN2·BN3 + P3 swing)
+//          4 elite closers parked (RP1·RP2·P1·P2) | P3 = 5th closer OR 6th SP
+//          Daily league: rotate SPs in/out of SP1·SP2 each day they pitch
 //          No RP on bench ever | SP allowed on bench
 //          5 prospect max in NA slots | Age 35+ only rounds 20+
 // WIN-NOW: Prefer age ≤32 contributors | Fill positional gaps within 2 picks
 // TOTAL:   30 roster spots (16 active + 4 BN + 5 NA + 5 IL)
 // ════════════════════════════════════════════════════════════════════
 const CONSTITUTION = {
-  // Pitching structure
-  SP_ACTIVE:          2,    // SP1, SP2
-  SP_PFLEX:           1,    // P1 = SP3
-  SP_BENCH:           1,    // BN1 = SP injury buffer
-  SP_TOTAL:           4,    // SP1+SP2+P1+BN1
-  RP_ACTIVE:          2,    // RP1, RP2 — elite closers only
-  RP_PFLEX:           2,    // P2, P3 — closers with stellar ratios
-  CLOSER_TOTAL:       4,    // RP1+RP2+P2+P3
+  // Pitching structure — DAILY LEAGUE rotation model
+  SP_ACTIVE:          2,    // SP1, SP2 — daily swap in/out whoever's pitching
+  SP_PFLEX:           0,    // P-flex slots now all closers
+  SP_BENCH:           3,    // BN1·BN2·BN3 = SP rotation room (daily league)
+  SP_TOTAL:           6,    // SP1+SP2+BN1+BN2+BN3 + P3 swing = 5-6 SPs
+  SP_SWING:           1,    // P3 = 5th closer OR 6th SP flex slot
+  RP_ACTIVE:          2,    // RP1, RP2 — elite closers, parked all season
+  RP_PFLEX:           2,    // P1, P2 — elite closers, parked all season
+  CLOSER_TOTAL:       4,    // RP1+RP2+P1+P2 — 4 parked elite SV+H arms
   // Closer quality thresholds for P-flex slots
   CLOSER_SVH_MIN:     25,
   CLOSER_ERA_MAX:     3.20,
@@ -4335,8 +4336,8 @@ const CONSTITUTION = {
   // SP quality thresholds
   ACE_HKB_MIN:        4000,
   ACE_PITCH_PLUS:     115,
-  // Bench hitters: BN2-4 = 3 hitters (multi-pos, speed, power)
-  BENCH_H_SLOTS:      3,
+  // Bench hitters: BN4 only — daily league uses wire for hitter depth
+  BENCH_H_SLOTS:      1,
   // Prospects — 5 NA slots, start stashing round 13
   MAX_PROSPECTS:      5,
   PROSPECT_AGE_MAX:   24,   // raised from 22 — catches age 23-24 NA-eligible players
@@ -4486,8 +4487,8 @@ function getTakeRecommendation() {
   const rpCount = myRPs.length;
   const hasAce  = mySPs.some(p=>(p.hkb||0)>=C.ACE_HKB_MIN||(p.pitchPlus||0)>=C.ACE_PITCH_PLUS);
   const hasSP2  = spCount >= 2;
-  const spFull  = spCount >= C.SP_TOTAL;   // 4 SPs: SP1+SP2+P1+BN1
-  const rpFull  = rpCount >= C.CLOSER_TOTAL; // 4 closers: RP1+RP2+P2+P3
+  const spFull  = spCount >= C.SP_TOTAL;   // 6 SPs: SP1+SP2+BN1+BN2+BN3+P3 swing
+  const rpFull  = rpCount >= C.CLOSER_TOTAL; // 4 closers: RP1+RP2+P1+P2
 
   // ── Available pools sorted by HKB desc ────────────────────────────
   const pool   = STATE.players.filter(avail).sort((a,b)=>(b.hkb||0)-(a.hkb||0));
@@ -4592,7 +4593,7 @@ function getTakeRecommendation() {
 
   // ── PRIORITY 2.5: SP URGENCY — force SP depth when critically short ──
   // If we have only 1 SP and it's past round 8, SP2 is an emergency.
-  // If we have only 1-2 SPs and it's past round 12, force SP before BDA.
+  // Daily league: target 5-6 SPs — force urgency adjusted for higher SP total.
   // SP pool: quality arms only (HKB ≥ 400 or DYN Z > 0)
   const qualitySP = poolSP.filter(p => (p.hkb||0) >= 400 || (p.dynZ||0) > 0);
   if (qualitySP.length) {
@@ -4601,10 +4602,12 @@ function getTakeRecommendation() {
     const spTopHKB = qualitySP[0]?.hkb || 0;
 
     // Force SP if critically short and round thresholds exceeded
+    // Daily league: more SP slots to fill so urgency kicks in earlier
     const forceSP = (
       (spCount < 2 && round >= 9)  ||  // only 1 SP past round 9 — emergency
-      (spCount < 3 && round >= 13) ||  // only 2 SPs past round 13
-      (spCount < 4 && round >= 17)     // only 3 SPs past round 17
+      (spCount < 3 && round >= 11) ||  // only 2 SPs past round 11
+      (spCount < 4 && round >= 14) ||  // only 3 SPs past round 14
+      (spCount < 5 && round >= 17)     // only 4 SPs past round 17
     );
 
     if (forceSP) {
@@ -4612,7 +4615,7 @@ function getTakeRecommendation() {
       if (!bda || bda.type === 'SP' || spBdaHKB < spTopHKB * 3.0) {
         return {
           player: qualitySP[0], tag: `SP #${spCount+1}`, color: 'var(--purple)',
-          reason: `Only ${spCount}/${C.SP_TOTAL} SPs in round ${round} — ${spNeeded} more needed. SP depth dries up fast. ${qualitySP[0].name} · HKB ${fmtK(spTopHKB)}.`,
+          reason: `Only ${spCount}/${C.SP_TOTAL} SPs in round ${round} — ${spNeeded} more needed. Daily league needs SP depth. ${qualitySP[0].name} · HKB ${fmtK(spTopHKB)}.`,
         };
       }
     }
